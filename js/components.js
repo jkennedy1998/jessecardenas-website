@@ -70,7 +70,27 @@ function buildEarringJelly(entry) {
   canvas.style.left = `${-(entry.frames.fw / 2 + pad)}px`;
   canvas.style.top = `${-pad}px`;
 
-  dangle.append(canvas);
+  // hover info card: name + materials, no price (price lives in the
+  // purchase UI). js/dangle.js slides it out from behind the photo on hover,
+  // left or right depending on which half of the board the piece hangs on.
+  const card = document.createElement("div");
+  card.className = "earring-hover-card";
+  card.style.top = `${entry.frames.fh / 2}px`;
+  const cardName = document.createElement("h3");
+  cardName.textContent = entry.title || entry.slug;
+  const cardMaterials = document.createElement("ul");
+  String(entry.materials || "")
+    .split(",")
+    .map((material) => material.trim())
+    .filter(Boolean)
+    .forEach((material) => {
+      const item = document.createElement("li");
+      item.textContent = material;
+      cardMaterials.append(item);
+    });
+  card.append(cardName, cardMaterials);
+
+  dangle.append(card, canvas);
   return dangle;
 }
 

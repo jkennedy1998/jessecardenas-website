@@ -251,6 +251,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
 
     Object.assign(state, {
       canvas, ctx: null, sheet,
+      card: dangle.querySelector(".earring-hover-card"),
       shadow, shadowCtx: shadow.getContext("2d"),
       fw: frames.fw, fh: frames.fh, cols: frames.cols, count: frames.count,
       fps: 1000 / (frames.frameMs || 40),
@@ -273,16 +274,25 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     if (state.draw) state.ctx = null;
     else state.ctx = canvas.getContext("2d");
 
-    // hover: a gentle wiggle through the frames (mouse only)
+    // hover: a gentle wiggle through the frames (mouse only) + the info card
+    // slides out from behind the photo, away from board center
     canvas.addEventListener("pointerenter", (event) => {
-      if (state.dragging || REDUCED || event.pointerType !== "mouse") return;
-      state.dialVel += HOVER_KICK * state.wiggleDir;
-      state.swingVel += SWING_HOVER * state.wiggleDir;
-      state.wiggleDir = -state.wiggleDir;
+      if (event.pointerType !== "mouse") return;
+      if (!state.dragging && !REDUCED) {
+        state.dialVel += HOVER_KICK * state.wiggleDir;
+        state.swingVel += SWING_HOVER * state.wiggleDir;
+        state.wiggleDir = -state.wiggleDir;
+      }
+      showHoverCard(state);
+    });
+    canvas.addEventListener("pointerleave", (event) => {
+      if (event.pointerType !== "mouse") return;
+      hideHoverCard(state);
     });
 
     // pickup: wiggle a little more; stroke in while grabbed
     state.onDragStart = () => {
+      hideHoverCard(state);
       if (!REDUCED) {
         state.dialVel += PICKUP_KICK * state.wiggleDir;
         state.swingVel += SWING_PICKUP * state.wiggleDir;
@@ -431,6 +441,30 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     state.renderPivot();
     items.push({ state, update: state.update });
     return state;
+  }
+
+  // Info card slide: the card rests centered BEHIND the photo (z-under the
+  // canvas) and slides out horizontally on hover — right if the piece hangs
+  // on the left half of the board, left if on the right half. The dangle's
+  // CSS scale scales the card with the earring, so offsets are dangle-space.
+  const CARD_GAP = 10; // dangle-space px between photo edge and card edge
+  function showHoverCard(state) {
+    const card = state.card;
+    if (!card) return;
+    const cw = card.offsetWidth;
+    const ch = card.offsetHeight;
+    const edge = state.fw / 2 + CARD_GAP;
+    const towardRight = state.x < 0.5;
+    card.style.transform = towardRight
+      ? `translate(${edge}px, ${-ch / 2}px)`
+      : `translate(${-(edge + cw)}px, ${-ch / 2}px)`;
+  }
+
+  function hideHoverCard(state) {
+    const card = state.card;
+    if (!card) return;
+    card.style.transform =
+      `translate(${-card.offsetWidth / 2}px, ${-card.offsetHeight / 2}px)`;
   }
 
   function drawJelly(state) {
