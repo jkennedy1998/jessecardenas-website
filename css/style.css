@@ -1,0 +1,275 @@
+/* jessecardenas.com — reusable horizontal slices, top bar + bottom bar.
+   No shared typeface system; clean system stack, color via per-entry CSS vars. */
+
+:root {
+  --site-bg: #ffffff;
+  --site-ink: #1c1b18;
+  --site-bar-bg: #1c1b18;
+  --site-bar-ink: #f4f1ea;
+  --card-selected: #2c6e49;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--site-bg);
+  color: var(--site-ink);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main { flex: 1; }
+
+/* ---------- top bar / bottom bar ---------- */
+
+.site-bar {
+  background: var(--site-bar-bg);
+  color: var(--site-bar-ink);
+}
+
+.site-bar-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.9rem 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.site-brand {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.site-nav { display: flex; gap: 1.2rem; flex-wrap: wrap; }
+
+.site-nav a {
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.75;
+}
+
+.site-nav a:hover, .site-nav a.active { opacity: 1; }
+
+.site-footer .site-bar-inner {
+  padding: 0.8rem 1.2rem;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+/* ---------- slices ---------- */
+
+.slice {
+  --slice-bg: #ffffff;
+  --slice-title: #1a1a1a;
+  --slice-subtitle: #666666;
+  --slice-desc: #444444;
+  background: var(--slice-bg);
+  color: var(--slice-desc);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.slice-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 3rem 1.2rem;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
+  gap: 2.5rem;
+  align-items: center;
+}
+
+.slice-bright { color-scheme: dark; }
+
+.slice-media img,
+.slice-media video {
+  width: 100%;
+  height: auto;
+  max-height: 70vh;
+  object-fit: contain;
+  display: block;
+}
+
+.slice-empty {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 3rem 1.2rem;
+  font-size: 1.05rem;
+  opacity: 0.7;
+}
+
+.slice[data-sold-out="true"] .slice-media { opacity: 0.55; }
+.slice[data-sold-out="true"] .slice-copy { opacity: 0.75; }
+
+.slice-copy h2 {
+  color: var(--slice-title);
+  font-size: 1.9rem;
+  font-weight: 650;
+  margin-bottom: 0.4rem;
+}
+
+.slice-subtitle {
+  color: var(--slice-subtitle);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 1.2rem;
+}
+
+.slice-desc { line-height: 1.55; margin-bottom: 1.4rem; white-space: pre-line; }
+
+.slice-meta { font-size: 0.9rem; opacity: 0.8; margin-bottom: 1.6rem; }
+
+/* ---------- grate board + hanging earrings (dragable pendulum) ---------- */
+
+/* The board renders assets/grate.png full-bleed; its aspect ratio matches the
+   image so the hardcoded node map in js/dangle.js stays pixel-aligned.
+   2-chain hang: the node point is the top-center of the top piece (it hangs
+   BELOW the node). The pivot is where the top piece's bottom-center meets the
+   bottom piece's top-center; only the bottom piece swings around it.
+   --pivot-y (set from the top piece's natural height by js/components.js)
+   places the swing at the top piece's bottom edge. Positioning, scale, and
+   swing are driven by js/dangle.js. */
+
+.earring-board {
+  position: relative;
+  width: min(92vw, 780px);
+  aspect-ratio: 1068 / 1084;
+  margin: 0 auto;
+  background: url("../assets/grate.png") no-repeat center / 100% 100%;
+}
+
+.earring-node {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d43a2f;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.earring-dangle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+
+.earring-pendant-swing {
+  position: absolute;
+  top: var(--pivot-y, 78px);
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+.earring-piece { position: absolute; left: 0; }
+
+.earring-piece-bottom { top: 0; transform: translateX(-50%); }
+
+.earring-piece-top {
+  top: 0;
+  transform: translateX(-50%);
+  cursor: grab;
+  touch-action: none;
+}
+
+.earring-piece-top:active { cursor: grabbing; }
+
+.earring-dangle-jelly { width: 0; height: 0; }
+
+.earring-jelly {
+  position: absolute;
+  top: 0;
+  transform-origin: 50% 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.earring-jelly:active { cursor: grabbing; }
+
+/* ---------- earring card / purchase controls ---------- */
+
+.earring-buy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.earring-price { font-weight: 650; font-size: 1.15rem; }
+
+.earring-stock { font-size: 0.9rem; opacity: 0.75; }
+
+.earring-stock.sold-out { color: #a03030; opacity: 1; }
+
+.buy-toggle {
+  font: inherit;
+  padding: 0.55rem 1.1rem;
+  border: 1.5px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+a.buy-toggle { text-decoration: none; display: inline-block; }
+
+.buy-toggle:hover { background: rgba(0, 0, 0, 0.06); }
+
+.buy-toggle[data-selected="true"] {
+  background: var(--card-selected);
+  border-color: var(--card-selected);
+  color: #ffffff;
+}
+
+.buy-toggle:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---------- cart tracker ---------- */
+
+.cart-tracker {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  background: var(--site-bar-bg);
+  color: var(--site-bar-ink);
+}
+
+.cart-tracker-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.8rem 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+}
+
+.cart-summary { flex: 1; font-size: 0.95rem; }
+
+.cart-checkout {
+  font: inherit;
+  padding: 0.55rem 1.4rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--card-selected);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.cart-checkout:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---------- small screens ---------- */
+
+@media (max-width: 820px) {
+  .slice-inner { grid-template-columns: 1fr; gap: 1.6rem; padding: 2.2rem 1.2rem; }
+}
