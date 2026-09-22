@@ -197,6 +197,15 @@ main { flex: 1; }
 
 .earring-jelly:active { cursor: grabbing; }
 
+/* contact shadow under the photo (js/dangle.js owns drawing + masking);
+   alpha is masked to the grate png so it never leaves the wire grid */
+.earring-jelly-shadow {
+  position: absolute;
+  top: 0;
+  transform-origin: 50% 0;
+  pointer-events: none;
+}
+
 /* ---------- earring card / purchase controls ---------- */
 
 .earring-buy {

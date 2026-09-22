@@ -81,6 +81,13 @@ const SWING_V_MAX = 1.2; // rad/s, swing velocity cap
 const SWING_BREEZE = 0.05; // ambient breeze strength on the swing
 const SWING_HOVER = 0.26; // rad/s, swing impulse on hover
 const SWING_PICKUP = 0.44; // rad/s, swing impulse on pickup
+// Contact shadow: the photo's own silhouette, blurred and tinted black,
+// drawn just below the body — then masked by the grate png's alpha so the
+// shadow only lands on the wire grid, never on the page background.
+const SHADOW_ALPHA = 0.2; // shadow opacity (20% black)
+const SHADOW_BLUR = 5; // px, sprite-space gaussian blur
+const SHADOW_DROP = 7; // px, downward offset from the body
+const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
 
   // Wire centerlines in assets/grate.png (px, intrinsic 1068x1084).
   const GRATE_W = 1068;
@@ -103,6 +110,13 @@ const SWING_PICKUP = 0.44; // rad/s, swing impulse on pickup
 
   const items = [];
   const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, value));
+
+  // Grate board texture for shadow masking — the same file the board CSS
+  // draws full-bleed; its alpha is the "shadow may land here" mask.
+  const grateImg = new Image();
+  grateImg.src = new URL("../assets/grate.png",
+    (typeof document !== "undefined" && document.currentScript
+      ? document.currentScript.src : window.location.href)).href;
 
   function nodeCount() {
     return (VERTICALS.length - 1) * HORIZONTALS.length;
@@ -221,11 +235,23 @@ const SWING_PICKUP = 0.44; // rad/s, swing impulse on pickup
     const canvas = dangle.querySelector("canvas.earring-jelly");
     const state = baseState(dangle, dangle.parentElement, { node, scale, length });
 
+    // shadow canvas sits under the body canvas, same geometry; dangle.js
+    // owns it because it needs per-frame state (frame index, position,
+    // scale, swing) to place and mask the contact shadow
+    const shadow = document.createElement("canvas");
+    shadow.className = "earring-jelly-shadow";
+    shadow.width = canvas.width;
+    shadow.height = canvas.height;
+    shadow.style.left = canvas.style.left;
+    shadow.style.top = canvas.style.top;
+    canvas.parentNode.insertBefore(shadow, canvas);
+
     const sheet = new Image();
     sheet.src = new URL(frames.sheet, document.location.href).href;
 
     Object.assign(state, {
       canvas, ctx: null, sheet,
+      shadow, shadowCtx: shadow.getContext("2d"),
       fw: frames.fw, fh: frames.fh, cols: frames.cols, count: frames.count,
       fps: 1000 / (frames.frameMs || 40),
       // dial state: angle (rad, unbounded) maps onto the sequence —
@@ -356,7 +382,9 @@ const SWING_PICKUP = 0.44; // rad/s, swing impulse on pickup
       }
       // CSS transform-origin is 50% 0 (the hook point), so this rotates the
       // png around the hang point; WebGL/canvas render inside is untouched
-      state.canvas.style.transform = `rotate(${state.swing}rad)`;
+      const swingTransform = `rotate(${state.swing}rad)`;
+      state.canvas.style.transform = swingTransform;
+      state.shadow.style.transform = swingTransform;
 
       // sequence percentage == angle percentage: one turn = the whole loop
       state.frameF = (((state.angle / TAU) * state.count) % state.count + state.count) % state.count;
@@ -396,6 +424,7 @@ const SWING_PICKUP = 0.44; // rad/s, swing impulse on pickup
       // them — drag yanks kick the dial above, so the piece turns as you move it
 
       drawJelly(state);
+      drawShadow(state);
       state.renderPivot();
     };
 
@@ -407,6 +436,60 @@ const SWING_PICKUP = 0.44; // rad/s, swing impulse on pickup
   function drawJelly(state) {
     if (state.draw) { state.draw(state); return; }
     drawJelly2D(state);
+  }
+
+  // Contact shadow: black blurred photo silhouette, slightly lower, then
+  // masked to the grate so it only shows on the wire grid. Board-to-grate
+  // mapping: the board draws grate.png at 100% 100%, so board fraction x
+  // board size -> grate intrinsic pixels. The canvas also rides the dangle
+  // origin (node point) and its CSS scale, so the source rect follows.
+  function drawShadow(state) {
+    const { canvas, shadowCtx: ctx, fw, fh, pad } = state;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!state.sheet.complete || !state.sheet.naturalWidth) return;
+    if (!grateImg.complete || !grateImg.naturalWidth) return;
+    const index = ((Math.floor(state.frameF) % state.count) + state.count) % state.count;
+    const sprite = buildShadowSprite(state, index);
+    ctx.globalAlpha = SHADOW_ALPHA;
+    ctx.drawImage(sprite, pad - SHADOW_PAD, pad - SHADOW_PAD + SHADOW_DROP);
+    const boardW = state.hang.clientWidth;
+    const boardH = state.hang.clientHeight;
+    const gx = grateImg.naturalWidth / boardW;
+    const gy = grateImg.naturalHeight / boardH;
+    const sx = (state.x * boardW - state.renderedScale * (fw / 2 + pad)) * gx;
+    const sy = (state.y * boardH - state.renderedScale * pad) * gy;
+    const sw = canvas.width * state.renderedScale * gx;
+    const sh = canvas.height * state.renderedScale * gy;
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.drawImage(grateImg, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  // Cached black blurred frame sprites (photo alpha), small two-slot cache
+  // matching buildSilhouette's eviction style.
+  function buildShadowSprite(state, index) {
+    if (!state.shadowSprites) state.shadowSprites = new Map();
+    let entry = state.shadowSprites.get(index);
+    if (!entry) {
+      if (state.shadowSprites.size >= 2) state.shadowSprites.clear();
+      const sprite = document.createElement("canvas");
+      sprite.width = state.fw + SHADOW_PAD * 2;
+      sprite.height = state.fh + SHADOW_PAD * 2;
+      const sctx = sprite.getContext("2d");
+      const sx = (index % state.cols) * state.fw;
+      const sy = Math.floor(index / state.cols) * state.fh;
+      sctx.filter = `blur(${SHADOW_BLUR}px)`;
+      sctx.drawImage(state.sheet, sx, sy, state.fw, state.fh,
+        SHADOW_PAD, SHADOW_PAD, state.fw, state.fh);
+      sctx.filter = "none";
+      sctx.globalCompositeOperation = "source-in";
+      sctx.fillStyle = "#000";
+      sctx.fillRect(0, 0, sprite.width, sprite.height);
+      entry = sprite;
+      state.shadowSprites.set(index, entry);
+    }
+    return entry;
   }
 
   // Fallback: draw horizontal strips whose edges follow the warped quad —
