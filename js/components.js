@@ -245,6 +245,85 @@ function buildEarringSlice(entry, index) {
   return section;
 }
 
+// Shop panel: the large card that shares the stage with the grid once the
+// user has anything selected. Minimal rows — name, single/pair mode, quantity
+// stepper, remaining stock (singles or pairs), line price — plus a total and
+// a checkout arrow. Price never appears on the board hover card; it lives here.
+function buildShopPanel(panel) {
+  const list = document.createElement("div");
+  list.className = "shop-list";
+  const footer = document.createElement("div");
+  footer.className = "shop-footer";
+  const total = document.createElement("span");
+  total.className = "shop-total";
+  const checkout = document.createElement("button");
+  checkout.className = "shop-checkout";
+  checkout.type = "button";
+  checkout.textContent = "checkout →";
+  checkout.addEventListener("click", () => window.Shop.checkout());
+  footer.append(total, checkout);
+  panel.append(list, footer);
+
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+
+  function stockText(item) {
+    if (!item.maxSingles) return "sold out";
+    return item.mode === "pair"
+      ? `${Math.floor(item.maxSingles / 2)} pairs left`
+      : `${item.maxSingles} left`;
+  }
+
+  function renderPanel() {
+    const state = window.Shop.summary();
+    document.body.classList.toggle("has-selection", state.list.length > 0);
+    list.replaceChildren();
+    for (const item of state.list) {
+      const row = el("div", "shop-row");
+      const head = el("div", "shop-row-head");
+      head.append(
+        el("span", "shop-name", item.title),
+        el("span", "shop-line-price", `$${window.Shop.lineTotal(item)}`),
+      );
+      const controls = el("div", "shop-row-controls");
+      const mode = el("div", "shop-mode");
+      for (const modeName of ["single", "pair"]) {
+        const button = el("button", "shop-mode-button", modeName);
+        button.type = "button";
+        button.dataset.active = String(item.mode === modeName);
+        button.addEventListener("click", () => window.Shop.setMode(item.slug, modeName));
+        mode.append(button);
+      }
+      const stepper = el("div", "shop-stepper");
+      const minus = el("button", "shop-stepper-button", "−");
+      minus.type = "button";
+      minus.addEventListener("click", () => window.Shop.setQuantity(item.slug, item.quantity - 1));
+      const qty = el("span", "shop-qty", String(item.quantity));
+      const plus = el("button", "shop-stepper-button", "+");
+      plus.type = "button";
+      plus.addEventListener("click", () => window.Shop.setQuantity(item.slug, item.quantity + 1));
+      stepper.append(minus, qty, plus);
+      const stock = el("span", "shop-stock", stockText(item));
+      const removeButton = el("button", "shop-remove", "×");
+      removeButton.type = "button";
+      removeButton.setAttribute("aria-label", `remove ${item.title}`);
+      removeButton.addEventListener("click", () => window.Shop.remove(item.slug));
+      controls.append(mode, stepper, stock, removeButton);
+      row.append(head, controls);
+      list.append(row);
+    }
+    total.textContent = state.list.length ? `$${state.total}` : "";
+    checkout.disabled = !state.list.length;
+  }
+
+  document.addEventListener("shop:change", renderPanel);
+  renderPanel();
+}
+
 function initEarringsPage() {
   const board = document.querySelector(".earring-board");
   const container = document.querySelector(".slices");
@@ -258,6 +337,7 @@ function initEarringsPage() {
     entries.map((entry) => entry.node).filter((node) => Number.isInteger(node)),
   );
   let autoNode = 0;
+  const jellyStates = [];
   entries.forEach((entry) => {
     // frame-sequence entries always hang on the board; split-piece entries
     // use the legacy hang; anything else falls back to a flat slice
@@ -276,7 +356,13 @@ function initEarringsPage() {
       // resolve the sheet against the site root (same as all other media
       // paths) — the page lives under /earrings/ but assets live at /source/
       const frames = { ...entry.frames, sheet: normalizeMediaPath(entry.frames.sheet) };
-      window.Dangle.createJelly(dangle, { node: nodeIndex, frames, scale: 0.7, length: 140 });
+      const jellyState = window.Dangle.createJelly(dangle, {
+        node: nodeIndex, frames, scale: 0.7, length: 140,
+        // board click toggles the cart item; the shop:change listener below
+        // syncs the visual back from cart truth
+        onSelect: () => window.Shop.toggle(entry),
+      });
+      jellyStates.push({ entry, state: jellyState });
       return;
     }
     if (!(entry.mediaTop && entry.mediaBottom)) {
@@ -297,6 +383,16 @@ function initEarringsPage() {
   });
 
   if (board && SHOW_GRID_NODES) renderNodeMarkers(board);
+
+  const panel = document.querySelector(".shop-panel");
+  if (panel) buildShopPanel(panel);
+
+  // visual selection follows cart truth (panel remove/mode changes included)
+  document.addEventListener("shop:change", () => {
+    for (const { entry, state } of jellyStates) {
+      state.setSelected(window.Shop.has(entry.slug));
+    }
+  });
 }
 
 const SHOW_GRID_NODES = false; // flip to true to debug node alignment

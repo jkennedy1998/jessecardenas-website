@@ -231,7 +231,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
 
   // ---------------- jelly path: whole gif on a jiggling quad ----------------
 
-  function createJelly(dangle, { node = 1, frames, scale = 0.7, length = 140 } = {}) {
+  function createJelly(dangle, { node = 1, frames, scale = 0.7, length = 140, onSelect } = {}) {
     const canvas = dangle.querySelector("canvas.earring-jelly");
     const state = baseState(dangle, dangle.parentElement, { node, scale, length });
 
@@ -301,12 +301,19 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       state.strokeTarget = STROKE_PX;
     };
 
-    // click (toggle selection): stroke in + scale up while selected
-    state.onSelect = () => {
-      state.selected = !state.selected;
-      state.strokeTarget = state.selected ? STROKE_PX : 0;
+    // click (toggle selection): stroke in + scale up while selected.
+    // Selection truth lives in the cart (window.Shop) — components.js passes
+    // opts.onSelect to route the click there and shop:change calls
+    // state.setSelected to sync the visual.
+    state.setSelected = (value) => {
+      state.selected = value;
+      state.strokeTarget = value ? STROKE_PX : 0;
       state.scaleTarget = state.baseScale *
-        (state.selected ? DRAG_SCALE : 1);
+        (value ? DRAG_SCALE : 1);
+    };
+    state.onSelect = () => {
+      state.setSelected(!state.selected);
+      if (opts.onSelect) opts.onSelect();
     };
 
     attachDrag(state, canvas, null, {
