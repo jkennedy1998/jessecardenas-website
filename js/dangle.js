@@ -75,12 +75,12 @@ const CLICK_PX = 6; // pointer travel below which a press is a click (select)
 // body acceleration (drag yanks, snap-back) kicks it so the bottom lags.
 const SWING_G = 470; // px/s^2, softened gravity -> slow heavy pendulum
 const SWING_DAMP = 0.9; // 1/s, bleeds swing energy over a few arcs
-const SWING_KICK = 1.0; // horizontal body accel -> swing coupling
+const SWING_KICK = 0.2; // horizontal body accel -> swing coupling
 const SWING_MAX = 1.1; // rad, swing clamp with inelastic bounce
-const SWING_V_MAX = 6; // rad/s, swing velocity cap
-const SWING_BREEZE = 0.22; // ambient breeze strength on the swing
-const SWING_HOVER = 1.3; // rad/s, swing impulse on hover
-const SWING_PICKUP = 2.2; // rad/s, swing impulse on pickup
+const SWING_V_MAX = 1.2; // rad/s, swing velocity cap
+const SWING_BREEZE = 0.05; // ambient breeze strength on the swing
+const SWING_HOVER = 0.26; // rad/s, swing impulse on hover
+const SWING_PICKUP = 0.44; // rad/s, swing impulse on pickup
 
   // Wire centerlines in assets/grate.png (px, intrinsic 1068x1084).
   const GRATE_W = 1068;
