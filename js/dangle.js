@@ -313,7 +313,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     };
     state.onSelect = () => {
       state.setSelected(!state.selected);
-      if (opts.onSelect) opts.onSelect();
+      if (onSelect) onSelect();
     };
 
     attachDrag(state, canvas, null, {
