@@ -59,16 +59,28 @@ const STROKE_TAPS_2D = 12; // outline taps in the canvas-2D fallback
 const TAU = Math.PI * 2;
 const DIAL_K = 6; // 1/s^2, soft spring back toward the rest frame
 const DIAL_DAMP = 1.8; // 1/s, bleed so a swipe coasts a moment, then settles
-const DIAL_BREEZE = 1.1; // ambient breeze strength on the dial (idle shimmer)
-const DIAL_KICK = 2.2; // drag acceleration -> dial coupling (see it turn)
-const DIAL_DRAG = 0.9; // pointer speed while dragging -> dial follow spin
+const DIAL_BREEZE = 0.37; // ambient breeze strength on the dial (idle shimmer)
+const DIAL_KICK = 0.75; // drag acceleration -> dial coupling (see it turn)
+const DIAL_DRAG = 0.3; // pointer speed while dragging -> dial follow spin
 const DIAL_DRAG_EASE = 10; // 1/s, how fast the dial follows pointer speed
 const DRAG_K_SCALE = 0.3; // rest-spring relax factor while dragging
 const DIAL_PX_PER_RAD = 110; // lower-half swipe: screen px per radian
-const DIAL_V_MAX = 45; // rad/s, dial velocity cap
-const HOVER_KICK = 26; // rad/s, wiggle impulse on hover
-const PICKUP_KICK = 42; // rad/s, bigger wiggle impulse on pickup
+const DIAL_V_MAX = 15; // rad/s, dial velocity cap
+const HOVER_KICK = 9; // rad/s, wiggle impulse on hover
+const PICKUP_KICK = 14; // rad/s, bigger wiggle impulse on pickup
 const CLICK_PX = 6; // pointer travel below which a press is a click (select)
+// Pivot swing: the png itself rotates around its top-center point (where the
+// hook hangs) like a real pendulum — separate from the dial (frame turn).
+// Softened gravity + damping give the piece a sense of weight; horizontal
+// body acceleration (drag yanks, snap-back) kicks it so the bottom lags.
+const SWING_G = 470; // px/s^2, softened gravity -> slow heavy pendulum
+const SWING_DAMP = 0.9; // 1/s, bleeds swing energy over a few arcs
+const SWING_KICK = 1.0; // horizontal body accel -> swing coupling
+const SWING_MAX = 1.1; // rad, swing clamp with inelastic bounce
+const SWING_V_MAX = 6; // rad/s, swing velocity cap
+const SWING_BREEZE = 0.22; // ambient breeze strength on the swing
+const SWING_HOVER = 1.3; // rad/s, swing impulse on hover
+const SWING_PICKUP = 2.2; // rad/s, swing impulse on pickup
 
   // Wire centerlines in assets/grate.png (px, intrinsic 1068x1084).
   const GRATE_W = 1068;
@@ -219,6 +231,8 @@ const CLICK_PX = 6; // pointer travel below which a press is a click (select)
       // dial state: angle (rad, unbounded) maps onto the sequence —
       // frameF = angle/TAU * count, looping on 0 and last
       angle: 0, dialVel: 0, prevDialVel: 0,
+      // pivot swing: the png rotates around its top-center (the hook)
+      swing: 0, swingVel: 0,
       wiggleDir: 1,
       selected: false,
       stroke: 0, strokeTarget: 0,
@@ -237,6 +251,7 @@ const CLICK_PX = 6; // pointer travel below which a press is a click (select)
     canvas.addEventListener("pointerenter", (event) => {
       if (state.dragging || REDUCED || event.pointerType !== "mouse") return;
       state.dialVel += HOVER_KICK * state.wiggleDir;
+      state.swingVel += SWING_HOVER * state.wiggleDir;
       state.wiggleDir = -state.wiggleDir;
     });
 
@@ -244,6 +259,7 @@ const CLICK_PX = 6; // pointer travel below which a press is a click (select)
     state.onDragStart = () => {
       if (!REDUCED) {
         state.dialVel += PICKUP_KICK * state.wiggleDir;
+        state.swingVel += SWING_PICKUP * state.wiggleDir;
         state.wiggleDir = -state.wiggleDir;
       }
       state.strokeTarget = STROKE_PX;
@@ -317,6 +333,30 @@ const CLICK_PX = 6; // pointer travel below which a press is a click (select)
       state.angle += state.dialVel * dt;
       const dialAcc = (state.dialVel - state.prevDialVel) / dt;
       state.prevDialVel = state.dialVel;
+
+      // pivot swing: pendulum around the hook (png top-center). Horizontal
+      // body acceleration drives it (the bottom lags the yank — also active
+      // while dragging, since axPx captures pointer motion), softened
+      // gravity swings it back, damping bleeds it out over a few arcs.
+      if (!REDUCED) {
+        state.swingVel += Math.sin(now / 1000 * 0.7 + state.phase) *
+          SWING_BREEZE * dt;
+      }
+      state.swingVel += -(SWING_G / state.effLength) *
+        Math.sin(state.swing) * dt;
+      state.swingVel += -(axPx / state.effLength) *
+        Math.cos(state.swing) * dt * SWING_KICK;
+      state.swingVel -= state.swingVel * SWING_DAMP * dt;
+      state.swingVel = clamp(state.swingVel, -SWING_V_MAX, SWING_V_MAX);
+      state.swing += state.swingVel * dt;
+      if (state.swing > SWING_MAX) {
+        state.swing = SWING_MAX; state.swingVel *= -0.35;
+      } else if (state.swing < -SWING_MAX) {
+        state.swing = -SWING_MAX; state.swingVel *= -0.35;
+      }
+      // CSS transform-origin is 50% 0 (the hook point), so this rotates the
+      // png around the hang point; WebGL/canvas render inside is untouched
+      state.canvas.style.transform = `rotate(${state.swing}rad)`;
 
       // sequence percentage == angle percentage: one turn = the whole loop
       state.frameF = (((state.angle / TAU) * state.count) % state.count + state.count) % state.count;
