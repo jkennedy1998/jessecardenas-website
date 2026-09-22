@@ -73,7 +73,7 @@ const CLICK_PX = 6; // pointer travel below which a press is a click (select)
 // hook hangs) like a real pendulum — separate from the dial (frame turn).
 // Softened gravity + damping give the piece a sense of weight; horizontal
 // body acceleration (drag yanks, snap-back) kicks it so the bottom lags.
-const SWING_G = 470; // px/s^2, softened gravity -> slow heavy pendulum
+const SWING_G = 940; // px/s^2, softened gravity -> heavy pendulum
 const SWING_DAMP = 0.9; // 1/s, bleeds swing energy over a few arcs
 const SWING_KICK = 0.2; // horizontal body accel -> swing coupling
 const SWING_MAX = 1.1; // rad, swing clamp with inelastic bounce
