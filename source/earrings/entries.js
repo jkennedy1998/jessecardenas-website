@@ -14,7 +14,7 @@ it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/blue-resin/frames.png","fw":132,"fh":236,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/blue-resin/frames.png","fw":250,"fh":235,"cols":8,"rows":4,"count":32,"frameMs":43}
   },
   {
     slug: "blue-screw",
@@ -30,7 +30,7 @@ it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/blue-screw/frames.png","fw":138,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/blue-screw/frames.png","fw":250,"fh":191,"cols":8,"rows":4,"count":32,"frameMs":90}
   },
   {
     slug: "blue-wood",
@@ -46,7 +46,7 @@ it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/blue-wood/frames.png","fw":159,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/blue-wood/frames.png","fw":154,"fh":226,"cols":8,"rows":4,"count":32,"frameMs":55}
   },
   {
     slug: "clear-resin-drop",
@@ -62,7 +62,7 @@ it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/clear-resin-drop/frames.png","fw":135,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/clear-resin-drop/frames.png","fw":132,"fh":226,"cols":8,"rows":4,"count":32,"frameMs":186}
   },
   {
     slug: "clear-resin-triangle",
@@ -78,7 +78,7 @@ it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/clear-resin-triangle/frames.png","fw":174,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/clear-resin-triangle/frames.png","fw":164,"fh":210,"cols":8,"rows":4,"count":32,"frameMs":193}
   },
   {
     slug: "duo-screw",
@@ -94,7 +94,7 @@ it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/duo-screw/frames.png","fw":138,"fh":178,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/duo-screw/frames.png","fw":130,"fh":176,"cols":8,"rows":4,"count":32,"frameMs":106}
   },
   {
     slug: "green-resin",
@@ -111,7 +111,7 @@ it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/green-resin/frames.png","fw":130,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/green-resin/frames.png","fw":129,"fh":234,"cols":8,"rows":4,"count":32,"frameMs":73}
   },
   {
     slug: "gummy-worm",
@@ -127,7 +127,7 @@ it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/gummy-worm/frames.png","fw":126,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/gummy-worm/frames.png","fw":250,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":102}
   },
   {
     slug: "loop-study",
@@ -159,7 +159,7 @@ it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/pin-hanger/frames.png","fw":124,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/pin-hanger/frames.png","fw":109,"fh":243,"cols":8,"rows":4,"count":32,"frameMs":47}
   },
   {
     slug: "red-diamond",
@@ -176,7 +176,7 @@ thread, it swings and settles — grab it and it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/red-diamond/frames.png","fw":166,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/red-diamond/frames.png","fw":145,"fh":192,"cols":8,"rows":4,"count":32,"frameMs":90}
   },
   {
     slug: "red-wood",
@@ -192,7 +192,7 @@ thread, it swings and settles — grab it and it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/red-wood/frames.png","fw":140,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/red-wood/frames.png","fw":143,"fh":208,"cols":8,"rows":4,"count":32,"frameMs":62}
   },
   {
     slug: "yellow-blue-hanger",
@@ -208,7 +208,7 @@ thread, it swings and settles — grab it and it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/yellow-blue-hanger/frames.png","fw":118,"fh":222,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/yellow-blue-hanger/frames.png","fw":106,"fh":225,"cols":8,"rows":4,"count":32,"frameMs":27}
   },
   {
     slug: "yellow-resin",
@@ -225,7 +225,7 @@ it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/yellow-resin/frames.png","fw":160,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/yellow-resin/frames.png","fw":159,"fh":208,"cols":8,"rows":4,"count":32,"frameMs":78}
   },
   {
     slug: "yellow-wood",
@@ -241,7 +241,7 @@ it wiggles.`,
     mediaFiles: {"images":[],"videos":[]},
     mediaTop: null,
     mediaBottom: null,
-    frames: {"sheet":"source/earrings/yellow-wood/frames.png","fw":149,"fh":250,"cols":8,"rows":4,"count":32,"frameMs":33}
+    frames: {"sheet":"source/earrings/yellow-wood/frames.png","fw":159,"fh":204,"cols":8,"rows":4,"count":32,"frameMs":46}
   },
   {
     slug: "yellow-wood-2",
