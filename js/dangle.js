@@ -57,17 +57,17 @@ const STROKE_TAPS_2D = 12; // outline taps in the canvas-2D fallback
 // earring "rotates" by shifting frames (looping on 0 and last) instead of
 // skewing the quad. The quad itself never rotates.
 const TAU = Math.PI * 2;
-const DIAL_K = 14; // 1/s^2, soft spring back toward the rest frame
-const DIAL_DAMP = 2.8; // 1/s, bleed so a swipe coasts a moment, then settles
-const DIAL_BREEZE = 0.5; // ambient breeze strength on the dial (idle shimmer)
-const DIAL_KICK = 1.0; // drag acceleration -> dial coupling (see it turn)
+const DIAL_K = 6; // 1/s^2, soft spring back toward the rest frame
+const DIAL_DAMP = 1.8; // 1/s, bleed so a swipe coasts a moment, then settles
+const DIAL_BREEZE = 1.1; // ambient breeze strength on the dial (idle shimmer)
+const DIAL_KICK = 2.2; // drag acceleration -> dial coupling (see it turn)
 const DIAL_DRAG = 0.9; // pointer speed while dragging -> dial follow spin
 const DIAL_DRAG_EASE = 10; // 1/s, how fast the dial follows pointer speed
 const DRAG_K_SCALE = 0.3; // rest-spring relax factor while dragging
 const DIAL_PX_PER_RAD = 110; // lower-half swipe: screen px per radian
-const DIAL_V_MAX = 30; // rad/s, dial velocity cap
-const HOVER_KICK = 16; // rad/s, wiggle impulse on hover
-const PICKUP_KICK = 30; // rad/s, bigger wiggle impulse on pickup
+const DIAL_V_MAX = 45; // rad/s, dial velocity cap
+const HOVER_KICK = 26; // rad/s, wiggle impulse on hover
+const PICKUP_KICK = 42; // rad/s, bigger wiggle impulse on pickup
 const CLICK_PX = 6; // pointer travel below which a press is a click (select)
 
   // Wire centerlines in assets/grate.png (px, intrinsic 1068x1084).
