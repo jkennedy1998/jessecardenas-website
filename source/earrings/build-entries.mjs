@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const palettePath = path.join(rootDir, "palette.json");
 const mediaName = /^image-(\d+)\.(png|jpe?g|webp|gif|svg)$/i;
 const pieceName = /^(top|bottom)\.(png|jpe?g|webp|svg)$/i;
 
@@ -38,7 +39,19 @@ function parseColorConfig(sourceText) {
 }
 
 const REQUIRED = ["title", "price", "quantity", "description"];
-const REQUIRED_COLORS = ["title", "subtitle", "description", "background", "brightness"];
+// Accent is the earring's canonical interaction color. The selected-outline
+// and selection-averaged shop color both derive from these entry values.
+const REQUIRED_COLORS = ["title", "subtitle", "description", "background", "brightness", "accent"];
+const PALETTE_TONES = ["light", "mid", "dark"];
+const palette = JSON.parse(await readFile(palettePath, "utf8"));
+for (const [family, tones] of Object.entries(palette)) {
+  const missingTones = PALETTE_TONES.filter((tone) => !tones[tone]);
+  const invalidTones = PALETTE_TONES.filter((tone) =>
+    tones[tone] && !/^#[\da-f]{6}$/i.test(tones[tone]));
+  if (missingTones.length || invalidTones.length) {
+    throw new Error(`palette.json: ${family} must declare valid light, mid, and dark hex colors`);
+  }
+}
 
 const dirEntries = await readdir(rootDir, { withFileTypes: true });
 const entries = [];
@@ -61,6 +74,10 @@ for (const dirEntry of dirEntries) {
   const missingColors = REQUIRED_COLORS.filter((key) => !colors[key]);
   if (missingColors.length) {
     throw new Error(`${slug}/entry.md: ## colors missing keys: ${missingColors.join(", ")}`);
+  }
+  colors.accent = colors.accent.toLowerCase();
+  if (!palette[colors.accent]) {
+    throw new Error(`${slug}/entry.md: ## colors accent must name a family from palette.json`);
   }
   const price = Number(parsed.price);
   const quantity = Number(parsed.quantity);
@@ -108,7 +125,7 @@ for (const dirEntry of dirEntries) {
 if (!entries.length) console.log("warning: no earring entries found under source/earrings/");
 
 const escapeTemplate = (text) => text.replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
-const content = `window.EARRINGS_PAGE_SOURCE = [\n${entries.map((entry) => `  {\n    slug: ${JSON.stringify(entry.slug)},\n    title: ${JSON.stringify(entry.title)},\n    price: ${entry.price},\n    quantity: ${entry.quantity},\n    materials: ${JSON.stringify(entry.materials)},\n    made: ${JSON.stringify(entry.made)},\n    description: \`${escapeTemplate(entry.description)}\`,\n    preset: ${JSON.stringify(entry.preset)},\n    node: ${JSON.stringify(entry.node)},\n    colors: ${JSON.stringify(entry.colors)},\n    mediaFiles: ${JSON.stringify(entry.mediaFiles)},\n    mediaTop: ${JSON.stringify(entry.mediaTop)},\n    mediaBottom: ${JSON.stringify(entry.mediaBottom)},\n    frames: ${JSON.stringify(entry.frames)}\n  }`).join(',\n')}\n];\n`;
+const content = `window.EARRING_COLOR_PALETTE = ${JSON.stringify(palette)};\n\nwindow.EARRINGS_PAGE_SOURCE = [\n${entries.map((entry) => `  {\n    slug: ${JSON.stringify(entry.slug)},\n    title: ${JSON.stringify(entry.title)},\n    price: ${entry.price},\n    quantity: ${entry.quantity},\n    materials: ${JSON.stringify(entry.materials)},\n    made: ${JSON.stringify(entry.made)},\n    description: \`${escapeTemplate(entry.description)}\`,\n    preset: ${JSON.stringify(entry.preset)},\n    node: ${JSON.stringify(entry.node)},\n    colors: ${JSON.stringify(entry.colors)},\n    mediaFiles: ${JSON.stringify(entry.mediaFiles)},\n    mediaTop: ${JSON.stringify(entry.mediaTop)},\n    mediaBottom: ${JSON.stringify(entry.mediaBottom)},\n    frames: ${JSON.stringify(entry.frames)}\n  }`).join(',\n')}\n];\n`;
 
 await writeFile(path.join(rootDir, 'entries.js'), content);
 console.log(`built ${entries.length} earring entr${entries.length === 1 ? "y" : "ies"} -> source/earrings/entries.js`);

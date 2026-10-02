@@ -1,0 +1,9 @@
+{
+  "yellow": { "light": "#e6ff81", "mid": "#e3d90a", "dark": "#bcab1c" },
+  "orange": { "light": "#f7d782", "mid": "#ffab2b", "dark": "#d56012" },
+  "red": { "light": "#ffbd7d", "mid": "#fe5f41", "dark": "#cb3f2e" },
+  "violet": { "light": "#ffaecf", "mid": "#ff8dba", "dark": "#cb2e8a" },
+  "purple": { "light": "#edb8f7", "mid": "#d26de8", "dark": "#a036dd" },
+  "bluie": { "light": "#9ddbfb", "mid": "#72aff3", "dark": "#5563d6" },
+  "green": { "light": "#7eeeb4", "mid": "#0dc9af", "dark": "#218c7e" }
+}

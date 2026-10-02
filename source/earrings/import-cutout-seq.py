@@ -89,6 +89,10 @@ def main():
                     help="source capture fps, for frameMs timing")
     ap.add_argument("--scale", type=float, default=0.5)
     ap.add_argument("--cols", type=int, default=8)
+    ap.add_argument("--pad", type=int, default=8,
+                    help="transparent margin around the union content bbox "
+                         "(source-scale px); raise it so swung frames and "
+                         "the hook never touch the sheet cell edges")
     ap.add_argument("--repair-alpha", action="store_true",
                     help="reconnect fragmented alpha (close + hole fill) — "
                          "for cutouts that split into blobs at some frames")
@@ -119,7 +123,7 @@ def main():
         top = min(top, box[1])
         right = max(right, box[2])
         bottom = max(bottom, box[3])
-    pad = 8
+    pad = args.pad
     left = max(0, left - pad)
     top = max(0, top - pad)
     right = min(keyed[0].size[0], right + pad)

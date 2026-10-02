@@ -51,6 +51,62 @@ function isVideoFile(file) {
   return /\.(mp4|webm|mov)$/i.test(file);
 }
 
+const DEFAULT_ACTIVE_PALETTE = { light: "#ced9d7", mid: "#4ad2d0", dark: "#261231" };
+const rgbFor = (color) => [1, 3, 5].map((offset) =>
+  Number.parseInt(color.slice(offset, offset + 2), 16));
+const hueFor = (color) => {
+  const [red, green, blue] = rgbFor(color).map((channel) => channel / 255);
+  const high = Math.max(red, green, blue);
+  const low = Math.min(red, green, blue);
+  const span = high - low;
+  if (!span) return 0;
+  const hue = high === red
+    ? ((green - blue) / span) % 6
+    : high === green
+      ? (blue - red) / span + 2
+      : (red - green) / span + 4;
+  return (hue * 60 + 360) % 360;
+};
+const hueDistance = (left, right) => Math.abs(((left - right + 540) % 360) - 180);
+const paletteFor = (family) => window.EARRING_COLOR_PALETTE?.[family] || DEFAULT_ACTIVE_PALETTE;
+
+function applyActivePalette(palette) {
+  const root = document.documentElement.style;
+  root.setProperty("--active-light", palette.light);
+  root.setProperty("--active-mid", palette.mid);
+  root.setProperty("--active-dark", palette.dark);
+  root.setProperty("--active-color", palette.mid);
+}
+
+// Each earring chooses one named palette family. For multiple selections,
+// blend their mid-tone hues around the color wheel, then snap to the nearest
+// indexed family. RGB averaging made blue + yellow look yellow; hue blending
+// makes their shared family green while preserving one cohesive UI palette.
+function setActiveColor(entries) {
+  const selected = entries.filter((entry) => window.Shop.has(entry.slug));
+  const paletteEntries = Object.entries(window.EARRING_COLOR_PALETTE || {});
+  if (!selected.length) {
+    // Keep the last family alive while the selling card fades away. Its
+    // opacity then blends that actual final color into the white page instead
+    // of briefly repainting it with the default teal palette.
+    return null;
+  }
+  if (!paletteEntries.length) {
+    applyActivePalette(DEFAULT_ACTIVE_PALETTE);
+    return DEFAULT_ACTIVE_PALETTE;
+  }
+  const hueVector = selected
+    .map((entry) => hueFor(paletteFor(entry.colors?.accent).mid) * Math.PI / 180)
+    .reduce((sum, hue) => ({ x: sum.x + Math.cos(hue), y: sum.y + Math.sin(hue) }), { x: 0, y: 0 });
+  const blendedHue = (Math.atan2(hueVector.y, hueVector.x) * 180 / Math.PI + 360) % 360;
+  const active = paletteEntries.reduce((closest, [, palette]) => {
+    const distance = hueDistance(hueFor(palette.mid), blendedHue);
+    return distance < closest.distance ? { palette, distance } : closest;
+  }, { palette: DEFAULT_ACTIVE_PALETTE, distance: Infinity }).palette;
+  applyActivePalette(active);
+  return active;
+}
+
 // Jelly path: the whole gif hangs from its top-middle point and is warped
 // as a 4-corner quad jiggle on a canvas (js/dangle.js createJelly owns
 // physics + play).
@@ -60,38 +116,104 @@ function buildEarringJelly(entry) {
 
   const canvas = document.createElement("canvas");
   canvas.className = "earring-jelly";
-  // extra transparent margin around the frame so the animated white stroke
-  // (js/dangle.js) can grow outside the gif without clipping
-  const pad = 10;
+  // Extra transparent margin lets the animated stroke grow without clipping.
+  const pad = 24;
   canvas.width = entry.frames.fw + pad * 2;
   canvas.height = entry.frames.fh + pad * 2;
-  // the gif's top-middle is the hang point, so keep the FRAME centered on the
-  // dangle origin (pivot) and let it extend downward
+  // The gif's top-middle is the hang point, so keep the FRAME centered on the
+  // dangle origin (pivot) and let it extend downward.
   canvas.style.left = `${-(entry.frames.fw / 2 + pad)}px`;
   canvas.style.top = `${-pad}px`;
 
-  // hover info card: name + materials, no price (price lives in the
-  // purchase UI). js/dangle.js slides it out from behind the photo on hover,
-  // left or right depending on which half of the board the piece hangs on.
-  const card = document.createElement("div");
-  card.className = "earring-hover-card";
-  card.style.top = `${entry.frames.fh / 2}px`;
-  const cardName = document.createElement("h3");
-  cardName.textContent = entry.title || entry.slug;
-  const cardMaterials = document.createElement("ul");
-  String(entry.materials || "")
-    .split(",")
-    .map((material) => material.trim())
-    .filter(Boolean)
-    .forEach((material) => {
-      const item = document.createElement("li");
-      item.textContent = material;
-      cardMaterials.append(item);
-    });
-  card.append(cardName, cardMaterials);
+  // The visible canvas is deliberately not the interaction target: its broad,
+  // transparent sprite margins made neighboring earrings steal each other's
+  // hover/clicks. This smaller plane follows the same pivot and leaves the
+  // painted outline fully visible.
+  const hitArea = document.createElement("div");
+  hitArea.className = "earring-jelly-hitarea";
+  const hitWidth = Math.round(entry.frames.fw * 0.7);
+  hitArea.style.width = `${hitWidth}px`;
+  hitArea.style.height = `${entry.frames.fh}px`;
+  hitArea.style.left = `${-hitWidth / 2}px`;
 
-  dangle.append(card, canvas);
+  dangle.append(canvas, hitArea);
   return dangle;
+}
+
+// One fixed card serves the whole board: it is populated from the entry data
+// on hover, so there can never be more than one visible at a time.
+function buildEarringHoverCard(stage) {
+  const card = document.createElement("article");
+  card.className = "earring-hover-card";
+  const title = document.createElement("h3");
+  const materials = document.createElement("p");
+  materials.className = "earring-hover-materials";
+  const description = document.createElement("p");
+  description.className = "earring-hover-description";
+  const price = document.createElement("p");
+  price.className = "earring-hover-price";
+  card.append(title, materials, description, price);
+  stage.append(card);
+
+  let activeState = null;
+  const place = (state) => {
+    const boardRect = state.hang.getBoundingClientRect();
+    // Do not use the canvas bounding box here: its box expands and contracts
+    // while CSS rotates the image. The fixed frame geometry keeps card text
+    // stable while a sequence changes or the earring swings.
+    const scale = state.renderedScale;
+    const imageWidth = state.canvas.width * scale;
+    const imageHeight = state.canvas.height * scale;
+    const center = boardRect.left + state.x * boardRect.width;
+    const centerY = boardRect.top + state.y * boardRect.height + state.fh * scale / 2;
+    card.style.height = `${Math.min(imageHeight * 0.86, window.innerHeight - 24)}px`;
+    const cardWidth = card.offsetWidth;
+    const cardHeight = card.offsetHeight;
+    // The board, not the browser viewport, determines the card side. This
+    // keeps cards for right-half earrings inside the grate side, away from
+    // the selling panel in horizontal layouts.
+    const wantsRight = state.x < 0.5;
+    // The card begins at the image center, behind the earring. Its inner
+    // padding reserves the covered half for the earring rather than text.
+    const left = wantsRight ? center : center - cardWidth;
+    card.dataset.side = wantsRight ? "right" : "left";
+    card.style.setProperty("--earring-clearance", `${imageWidth / 2 + 10}px`);
+    card.style.left = `${Math.max(12, Math.min(left, window.innerWidth - cardWidth - 12))}px`;
+    const top = centerY - cardHeight / 2;
+    card.style.top = `${Math.max(12, Math.min(top, window.innerHeight - cardHeight - 12))}px`;
+    card.style.setProperty("--card-slide-x", `${wantsRight ? -imageWidth / 2 : imageWidth / 2}px`);
+  };
+
+  window.addEventListener("resize", () => {
+    if (activeState) place(activeState);
+  });
+
+  return {
+    show(entry, state) {
+      const changedEarring = activeState !== state;
+      activeState = state;
+      if (changedEarring) {
+        title.textContent = entry.title || entry.slug;
+        materials.textContent = entry.materials || "";
+        materials.hidden = !entry.materials;
+        description.textContent = entry.description || "";
+        description.hidden = !entry.description;
+        price.textContent = `$${entry.price}`;
+      }
+      const cardPalette = paletteFor(entry.colors?.accent);
+      card.style.setProperty("--card-color", cardPalette.dark);
+      card.style.setProperty("--card-dark", cardPalette.dark);
+      card.style.setProperty("--card-mid", cardPalette.mid);
+      card.style.setProperty("--card-light", cardPalette.light);
+      card.classList.toggle("is-selected", window.Shop.has(entry.slug));
+      place(state);
+      card.classList.add("is-active");
+    },
+    hide() {
+      activeState = null;
+      card.classList.remove("is-active");
+    },
+  };
 }
 
 function buildEarringHang(entry, nodeIndex) {
@@ -278,9 +400,40 @@ function buildShopPanel(panel) {
       : `${item.maxSingles} left`;
   }
 
+  let panelCloseTimer = null;
+  let panelOpenFrame = null;
+
   function renderPanel() {
     const state = window.Shop.summary();
-    document.body.classList.toggle("has-selection", state.list.length > 0);
+    if (!state.list.length) {
+      // Keep the last rendered card in place while it fades out; collapsing
+      // the grid only after the 0.6s exit avoids a visible snap.
+      if (document.body.classList.contains("has-selection")) {
+        cancelAnimationFrame(panelOpenFrame);
+        document.body.classList.remove("is-selling-open");
+        clearTimeout(panelCloseTimer);
+        panelCloseTimer = window.setTimeout(() => {
+          document.body.classList.remove("has-selection");
+          list.replaceChildren();
+          total.textContent = "";
+          checkout.disabled = true;
+        }, 600);
+        return;
+      }
+      list.replaceChildren();
+      total.textContent = "";
+      checkout.disabled = true;
+      return;
+    }
+    clearTimeout(panelCloseTimer);
+    if (!document.body.classList.contains("has-selection")) {
+      document.body.classList.add("has-selection");
+      cancelAnimationFrame(panelOpenFrame);
+      panelOpenFrame = requestAnimationFrame(() =>
+        document.body.classList.add("is-selling-open"));
+    } else {
+      document.body.classList.add("is-selling-open");
+    }
     list.replaceChildren();
     for (const item of state.list) {
       const row = el("div", "shop-row");
@@ -290,14 +443,17 @@ function buildShopPanel(panel) {
         el("span", "shop-line-price", `$${window.Shop.lineTotal(item)}`),
       );
       const controls = el("div", "shop-row-controls");
-      const mode = el("div", "shop-mode");
+      // A normal compact picker replaces the ambiguous segmented single/pair
+      // control while keeping the available purchase choices explicit.
+      const mode = el("select", "shop-mode");
+      mode.setAttribute("aria-label", `purchase format for ${item.title}`);
       for (const modeName of ["single", "pair"]) {
-        const button = el("button", "shop-mode-button", modeName);
-        button.type = "button";
-        button.dataset.active = String(item.mode === modeName);
-        button.addEventListener("click", () => window.Shop.setMode(item.slug, modeName));
-        mode.append(button);
+        const option = el("option", "", modeName === "single" ? "single earring" : "pair");
+        option.value = modeName;
+        option.selected = item.mode === modeName;
+        mode.append(option);
       }
+      mode.addEventListener("change", () => window.Shop.setMode(item.slug, mode.value));
       const stepper = el("div", "shop-stepper");
       const minus = el("button", "shop-stepper-button", "−");
       minus.type = "button";
@@ -327,6 +483,8 @@ function buildShopPanel(panel) {
 function initEarringsPage() {
   const board = document.querySelector(".earring-board");
   const container = document.querySelector(".slices");
+  const stage = document.querySelector(".earring-stage");
+  const hoverCard = stage ? buildEarringHoverCard(stage) : null;
   const entries = window.EARRINGS_PAGE_SOURCE || [];
   if (!entries.length) {
     if (container) container.innerHTML = '<p class="slice-empty">no earrings listed yet — check back soon.</p>';
@@ -358,9 +516,14 @@ function initEarringsPage() {
       const frames = { ...entry.frames, sheet: normalizeMediaPath(entry.frames.sheet) };
       const jellyState = window.Dangle.createJelly(dangle, {
         node: nodeIndex, frames, scale: 0.7, length: 140,
+        accentColor: paletteFor(entry.colors?.accent).dark,
         // board click toggles the cart item; the shop:change listener below
         // syncs the visual back from cart truth
         onSelect: () => window.Shop.toggle(entry),
+        onHover: (state) => {
+          if (state) hoverCard?.show(entry, state);
+          else hoverCard?.hide();
+        },
       });
       jellyStates.push({ entry, state: jellyState });
       return;
@@ -387,12 +550,15 @@ function initEarringsPage() {
   const panel = document.querySelector(".shop-panel");
   if (panel) buildShopPanel(panel);
 
-  // visual selection follows cart truth (panel remove/mode changes included)
-  document.addEventListener("shop:change", () => {
+  // Visual selection and the global UI color both follow cart truth.
+  const syncSelection = () => {
+    setActiveColor(entries);
     for (const { entry, state } of jellyStates) {
       state.setSelected(window.Shop.has(entry.slug));
     }
-  });
+  };
+  document.addEventListener("shop:change", syncSelection);
+  syncSelection();
 }
 
 const SHOW_GRID_NODES = false; // flip to true to debug node alignment

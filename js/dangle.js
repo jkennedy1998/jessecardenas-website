@@ -11,7 +11,7 @@
 //    angle maps onto sequence percentage (one turn = the full loop, wrapping
 //    on 0 and last), so hover wiggles it, pickup wiggles it more, dragging
 //    yanks it through frames, and a lower-half swipe dials it around with a
-//    little momentum. A click toggles selection (stroke + scale-up, multi).
+//    little momentum. A click toggles selection (stroke only, multi).
 // 2. create — legacy two-piece split hang (top.png + bottom.png). Kept as a
 //    fallback for entries without frames.json.
 //
@@ -25,8 +25,11 @@ window.Dangle = (() => {
   const DAMPING = 1.35; // 1/s, bleeds swing energy so it settles quickly
   const BREEZE = 0.18; // ambient breeze strength
   const SNAP_PULL = 13; // 1/s, fast approach + ease-out settle onto a node
-  const DRAG_SCALE = 1.55; // earring scales up by this while being dragged
-  const SCALE_EASE = 10; // 1/s, ease for scale-up (drag) and scale-down (place)
+  const HOVER_SCALE = 1.55; // only the actively hovered/dragged earring grows
+  const SCALE_EASE = 10; // 1/s, ease for hover scale-up and scale-down
+  const BOARD_REFERENCE_WIDTH = 780; // CSS px: the grate's full desktop width
+  const BASE_DEPTH_RANGE = 9; // lower-hanging earrings render in front
+  const HOVER_DEPTH = 100; // hovered earring rises above the purchase panel
 
   // Jelly warp (whole-gif path). Just 4 corner points on the quad, each a
 // small damped spring at rest. Body acceleration and pendulum angular
@@ -45,13 +48,13 @@ const CORNER_WEIGHTS = [0.22, 0.22, 1, 1]; // TL, TR, BL, BR response weight
 const CORNER_MAX_X = 0.09; // max corner x offset, fraction of frame width
 const CORNER_MAX_Y = 0.05; // max corner y offset, fraction of frame height
 const MAX_CORNER_V = 700; // px/s, corner velocity cap
-// White silhouette stroke behind the gif (sprite alpha, see js/jelly-gl.js).
-// The radius is a state value you drive: strokeTarget = px radius, state.stroke
-// eases toward it, so in/out = grow/shrink. Defaults: stroke in on grab,
-// stroke out on release.
-const STROKE_PX = 5; // px, outline radius while stroked in (frame-space)
+// Colored/white silhouette stroke behind the gif (sprite alpha, see
+// js/jelly-gl.js). A modest radius plus dense samples preserves a single clean
+// contour instead of visibly repeating the earring image around its edge.
+const STROKE_PX = 12; // px, outline radius while stroked in (frame-space)
 const STROKE_EASE = 12; // 1/s, ease for stroke in/out
-const STROKE_TAPS_2D = 12; // outline taps in the canvas-2D fallback
+const STROKE_COLOR_DURATION = 0.6; // seconds, cubic ease-out to the new family color
+const STROKE_TAPS_2D = 40; // outline taps in the canvas-2D fallback
 // Dial: the image sequence IS the rotation. sequence percentage == angle
 // percentage — one full turn (TAU) maps onto the whole frame loop, so the
 // earring "rotates" by shifting frames (looping on 0 and last) instead of
@@ -110,6 +113,12 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
 
   const items = [];
   const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, value));
+  const hexToRgb = (color) => {
+    const hex = String(color || "").replace(/^#/, "");
+    if (!/^[\da-f]{6}$/i.test(hex)) return [1, 1, 1];
+    return [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
+  };
+  const rgbToCss = (rgb) => `rgb(${rgb.map((channel) => Math.round(channel * 255)).join(", ")})`;
 
   // Grate board texture for shadow masking — the same file the board CSS
   // draws full-bleed; its alpha is the "shadow may land here" mask.
@@ -149,7 +158,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       state.dragStart = { x: event.clientX, y: event.clientY, t: performance.now() };
       state.pointer = { x: event.clientX, y: event.clientY, t: performance.now() };
       state.pointerVelocityX = 0;
-      state.scaleTarget = state.baseScale * DRAG_SCALE;
+      state.scaleTarget = state.baseScale * (state.hoverScale || HOVER_SCALE);
       if (state.onDragStart) state.onDragStart();
       grabber.setPointerCapture(event.pointerId);
       event.preventDefault();
@@ -194,12 +203,16 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       if (travel < CLICK_PX && brief && state.onSelect) state.onSelect();
       state.dragStart = null;
       state.dragMode = "move";
-      // drop onto the nearest node; it becomes the earring's new home
-      state.node = nearestNode(state.x, state.y);
-      state.home = nodePoint(state.node);
-      // selected earrings stay scaled up and stroked, like while dragged
-      state.scaleTarget = state.baseScale * (state.selected ? DRAG_SCALE : 1);
-      state.strokeTarget = state.selected ? STROKE_PX : 0;
+      // showcase embeds keep their fixed home; board pieces drop onto the
+      // nearest node, which becomes the earring's new home
+      if (!state.fixedHome) {
+        state.node = nearestNode(state.x, state.y);
+        state.home = nodePoint(state.node);
+      }
+      // Selection retains its outline only; size belongs to the hovered item.
+      state.scaleTarget = state.baseScale *
+        (state.hovered ? (state.hoverScale || HOVER_SCALE) : 1);
+      state.strokeTarget = state.selected || state.hovered ? STROKE_PX : 0;
       if (releaseExtra) releaseExtra();
     };
     grabber.addEventListener("pointerup", release);
@@ -208,12 +221,16 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
 
   function baseState(dangle, board, { node = 1, scale = 0.6, length = 160 }) {
     const home = nodePoint(node) || { x: 0.5, y: 0.3 };
+    const boardWidth = board.clientWidth || BOARD_REFERENCE_WIDTH;
+    const boardScale = boardWidth / BOARD_REFERENCE_WIDTH;
+    const initialScale = scale * boardScale;
     const state = {
       dangle, hang: board,
       home, node,
       x: home.x, y: home.y,
-      scale, baseScale: scale,
-      renderedScale: scale, scaleTarget: scale,
+      designScale: scale, baseScale: initialScale,
+      scale: initialScale, renderedScale: initialScale, scaleTarget: initialScale,
+      length, boardWidth,
       dragging: false,
       pointer: null, pointerVelocityX: 0, lastPointerAx: 0,
       prevX: home.x, prevVx: 0,
@@ -224,35 +241,78 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       state.dangle.style.left = `${state.x * 100}%`;
       state.dangle.style.top = `${state.y * 100}%`;
       state.dangle.style.scale = String(state.renderedScale);
+      state.dangle.style.zIndex = String(state.hovered
+        ? HOVER_DEPTH
+        : Math.round((1 - state.y) * BASE_DEPTH_RANGE));
     };
-    state.effLength = length * scale;
+    state.effLength = length * initialScale;
     return state;
+  }
+
+  // The board changes width both at viewport breakpoints and when the shop
+  // pane opens. Keep the earring's current scale state proportional to that
+  // width, so its size remains physically matched to the grate wires.
+  function syncBoardScale(state) {
+    const boardWidth = state.hang.clientWidth;
+    if (!boardWidth || boardWidth === state.boardWidth) return;
+    const previousBaseScale = state.baseScale;
+    const nextBaseScale = state.designScale * boardWidth / BOARD_REFERENCE_WIDTH;
+    const ratio = previousBaseScale ? nextBaseScale / previousBaseScale : 1;
+    state.boardWidth = boardWidth;
+    state.baseScale = nextBaseScale;
+    state.renderedScale *= ratio;
+    state.scaleTarget *= ratio;
+    state.scale = state.renderedScale;
+    state.effLength = state.length * state.renderedScale;
   }
 
   // ---------------- jelly path: whole gif on a jiggling quad ----------------
 
-  function createJelly(dangle, { node = 1, frames, scale = 0.7, length = 140, onSelect } = {}) {
+  function createJelly(dangle, {
+    node = 1, frames, scale = 0.7, length = 140, accentColor = "#261231", onSelect, onHover,
+    // showcase embeds: fixed hang point, no board drop/grate shadow, and
+    // optional stroke — everything else (dial, swing, corners, breeze) is
+    // the same physics the board runs
+    home = null, shadow = true, stroke = true, hoverScale = HOVER_SCALE,
+  } = {}) {
     const canvas = dangle.querySelector("canvas.earring-jelly");
+    const hitArea = dangle.querySelector(".earring-jelly-hitarea");
     const state = baseState(dangle, dangle.parentElement, { node, scale, length });
+
+    if (home) {
+      state.fixedHome = true;
+      state.hoverScale = hoverScale;
+      state.home = home;
+      state.x = home.x;
+      state.y = home.y;
+    }
 
     // shadow canvas sits under the body canvas, same geometry; dangle.js
     // owns it because it needs per-frame state (frame index, position,
-    // scale, swing) to place and mask the contact shadow
-    const shadow = document.createElement("canvas");
-    shadow.className = "earring-jelly-shadow";
-    shadow.width = canvas.width;
-    shadow.height = canvas.height;
-    shadow.style.left = canvas.style.left;
-    shadow.style.top = canvas.style.top;
-    canvas.parentNode.insertBefore(shadow, canvas);
+    // scale, swing) to place and mask the contact shadow. Showcase embeds
+    // render straight onto the page, so they skip the grate-masked shadow.
+    let shadowCanvas = null;
+    if (shadow) {
+      shadowCanvas = document.createElement("canvas");
+      shadowCanvas.className = "earring-jelly-shadow";
+      shadowCanvas.width = canvas.width;
+      shadowCanvas.height = canvas.height;
+      shadowCanvas.style.left = canvas.style.left;
+      shadowCanvas.style.top = canvas.style.top;
+      canvas.parentNode.insertBefore(shadowCanvas, canvas);
+    }
 
     const sheet = new Image();
     sheet.src = new URL(frames.sheet, document.location.href).href;
 
     Object.assign(state, {
-      canvas, ctx: null, sheet,
-      card: dangle.querySelector(".earring-hover-card"),
-      shadow, shadowCtx: shadow.getContext("2d"),
+      canvas, hitArea, ctx: null, sheet,
+      hovered: false, onHover,
+      accentColor, strokeColor: "#ffffff", strokeRgb: [1, 1, 1],
+      useStroke: stroke,
+      strokeRgbFrom: [1, 1, 1], strokeRgbTarget: [1, 1, 1],
+      strokeColorElapsed: STROKE_COLOR_DURATION, renderedStrokeColor: "#ffffff",
+      shadow: shadowCanvas, shadowCtx: shadowCanvas ? shadowCanvas.getContext("2d") : null,
       fw: frames.fw, fh: frames.fh, cols: frames.cols, count: frames.count,
       fps: 1000 / (frames.frameMs || 40),
       // dial state: angle (rad, unbounded) maps onto the sequence —
@@ -267,6 +327,18 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       corners: CORNER_WEIGHTS.map(() => ({ x: 0, y: 0, vx: 0, vy: 0 })),
     });
 
+    state.syncStrokeColor = () => {
+      // Selection owns the color even while hovered; only unselected hover
+      // states use the temporary white outline. Color itself eases separately
+      // from stroke width, so it never snaps as selection changes.
+      const color = state.selected ? state.accentColor : "#ffffff";
+      if (state.strokeColor === color) return;
+      state.strokeColor = color;
+      state.strokeRgbFrom = [...state.strokeRgb];
+      state.strokeRgbTarget = hexToRgb(color);
+      state.strokeColorElapsed = 0;
+    };
+
     // WebGL bilinear-quad renderer when available, canvas-2D fallback otherwise
     state.draw = window.JellyGL
       ? window.JellyGL.create(canvas, frames)
@@ -274,25 +346,39 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     if (state.draw) state.ctx = null;
     else state.ctx = canvas.getContext("2d");
 
-    // hover: a gentle wiggle through the frames (mouse only) + the info card
-    // slides out from behind the photo, away from board center
-    canvas.addEventListener("pointerenter", (event) => {
+    // Hover raises this earring and activates the one board-level info card.
+    hitArea.addEventListener("pointerenter", (event) => {
       if (event.pointerType !== "mouse") return;
       if (!state.dragging && !REDUCED) {
         state.dialVel += HOVER_KICK * state.wiggleDir;
         state.swingVel += SWING_HOVER * state.wiggleDir;
         state.wiggleDir = -state.wiggleDir;
       }
-      showHoverCard(state);
+      state.hovered = true;
+      state.scaleTarget = state.baseScale * HOVER_SCALE;
+      state.strokeTarget = STROKE_PX;
+      state.syncStrokeColor();
+      state.renderPivot();
+      if (state.onHover) state.onHover(state);
     });
-    canvas.addEventListener("pointerleave", (event) => {
-      if (event.pointerType !== "mouse") return;
-      hideHoverCard(state);
+    hitArea.addEventListener("pointerleave", (event) => {
+      if (event.pointerType !== "mouse" || state.dragging) return;
+      state.hovered = false;
+      state.scaleTarget = state.baseScale;
+      state.strokeTarget = state.selected ? STROKE_PX : 0;
+      state.syncStrokeColor();
+      state.renderPivot();
+      if (state.onHover) state.onHover(null);
     });
 
-    // pickup: wiggle a little more; stroke in while grabbed
+    // pickup keeps the hover card and outline alive, including dial rotation.
     state.onDragStart = () => {
-      hideHoverCard(state);
+      state.hovered = true;
+      state.scaleTarget = state.baseScale * HOVER_SCALE;
+      state.strokeTarget = STROKE_PX;
+      state.syncStrokeColor();
+      state.renderPivot();
+      if (state.onHover) state.onHover(state);
       if (!REDUCED) {
         state.dialVel += PICKUP_KICK * state.wiggleDir;
         state.swingVel += SWING_PICKUP * state.wiggleDir;
@@ -301,37 +387,41 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       state.strokeTarget = STROKE_PX;
     };
 
-    // click (toggle selection): stroke in + scale up while selected.
+    // click toggles selection: selected pieces retain the stroke, not the size.
     // Selection truth lives in the cart (window.Shop) — components.js passes
     // opts.onSelect to route the click there and shop:change calls
     // state.setSelected to sync the visual.
     state.setSelected = (value) => {
       state.selected = value;
-      state.strokeTarget = value ? STROKE_PX : 0;
+      state.strokeTarget = value || state.hovered ? STROKE_PX : 0;
       state.scaleTarget = state.baseScale *
-        (value ? DRAG_SCALE : 1);
+        (state.hovered ? HOVER_SCALE : 1);
+      state.syncStrokeColor();
     };
     state.onSelect = () => {
       state.setSelected(!state.selected);
       if (onSelect) onSelect();
     };
 
-    attachDrag(state, canvas, null, {
-      // lower half of the body = dial swipe zone; upper half = grab/move
+    attachDrag(state, hitArea, null, {
+      // Lower half of the tight interaction plane = dial swipe zone; upper
+      // half = grab/move. The painted canvas itself never captures input.
       modeFor: (event) => {
-        const rect = canvas.getBoundingClientRect();
+        const rect = hitArea.getBoundingClientRect();
         const localY = event.clientY - rect.top;
         return localY > rect.height * 0.5 ? "dial" : "move";
       },
     });
 
     state.update = (dt, now) => {
+      syncBoardScale(state);
       const boardW = state.hang.clientWidth;
 
       // scale eases toward its target: up while dragged, back down when placed
       state.renderedScale += (state.scaleTarget - state.renderedScale) *
         Math.min(1, SCALE_EASE * dt);
       state.scale = state.renderedScale;
+      state.effLength = state.length * state.renderedScale;
 
       // body acceleration (px/s^2) from position deltas — captures both
       // pointer-driven motion and the snap-back motion
@@ -401,14 +491,27 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       // png around the hang point; WebGL/canvas render inside is untouched
       const swingTransform = `rotate(${state.swing}rad)`;
       state.canvas.style.transform = swingTransform;
-      state.shadow.style.transform = swingTransform;
+      state.hitArea.style.transform = swingTransform;
+      // The contact shadow is composited against the stationary grate. Keep
+      // its canvas planar so rotating a pendant never rotates that grid mask.
+      if (state.shadow) state.shadow.style.transform = "none";
 
       // sequence percentage == angle percentage: one turn = the whole loop
       state.frameF = (((state.angle / TAU) * state.count) % state.count + state.count) % state.count;
 
-      // stroke eases toward its target: grows while grabbed, shrinks on release
+      // Stroke width has its own quick physical ease, while its color takes a
+      // visible 0.6s cubic ease-out: immediate movement, gentle final settle.
+      if (!state.useStroke) state.strokeTarget = 0;
       state.stroke += (state.strokeTarget - state.stroke) *
         Math.min(1, STROKE_EASE * dt);
+      state.strokeColorElapsed = Math.min(
+        STROKE_COLOR_DURATION, state.strokeColorElapsed + dt,
+      );
+      const colorProgress = state.strokeColorElapsed / STROKE_COLOR_DURATION;
+      const colorEase = 1 - (1 - colorProgress) ** 3;
+      state.strokeRgb = state.strokeRgbFrom.map((from, index) =>
+        from + (state.strokeRgbTarget[index] - from) * colorEase);
+      state.renderedStrokeColor = rgbToCss(state.strokeRgb);
 
       // quad corner jiggle: acceleration kicks corner velocity (inertia:
       // the corner lags the yank), the spring pulls it straight back. No
@@ -441,8 +544,9 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       // them — drag yanks kick the dial above, so the piece turns as you move it
 
       drawJelly(state);
-      drawShadow(state);
+      if (state.shadow) drawShadow(state);
       state.renderPivot();
+      if (state.hovered && state.onHover) state.onHover(state);
     };
 
     state.renderPivot();
@@ -450,32 +554,21 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     return state;
   }
 
-  // Info card slide: the card rests centered BEHIND the photo (z-under the
-  // canvas) and slides out horizontally on hover — right if the piece hangs
-  // on the left half of the board, left if on the right half. The dangle's
-  // CSS scale scales the card with the earring, so offsets are dangle-space.
-  const CARD_GAP = 10; // dangle-space px between photo edge and card edge
-  function showHoverCard(state) {
-    const card = state.card;
-    if (!card) return;
-    const cw = card.offsetWidth;
-    const ch = card.offsetHeight;
-    const edge = state.fw / 2 + CARD_GAP;
-    const towardRight = state.x < 0.5;
-    card.style.transform = towardRight
-      ? `translate(${edge}px, ${-ch / 2}px)`
-      : `translate(${-(edge + cw)}px, ${-ch / 2}px)`;
-  }
-
-  function hideHoverCard(state) {
-    const card = state.card;
-    if (!card) return;
-    card.style.transform =
-      `translate(${-card.offsetWidth / 2}px, ${-card.offsetHeight / 2}px)`;
-  }
-
   function drawJelly(state) {
-    if (state.draw) { state.draw(state); return; }
+    if (state.draw && !state.draw.failed) { state.draw(state); return; }
+    if (state.draw && state.draw.failed && !state.ctx) {
+      // WebGL tainted the canvas (file:// pages) — a 2D context can't be
+      // created on it, so swap in a clean canvas and continue on the 2D path.
+      const two = document.createElement("canvas");
+      two.className = state.canvas.className;
+      two.width = state.canvas.width;
+      two.height = state.canvas.height;
+      two.style.left = state.canvas.style.left;
+      two.style.top = state.canvas.style.top;
+      state.canvas.replaceWith(two);
+      state.canvas = two;
+      state.ctx = two.getContext("2d");
+    }
     drawJelly2D(state);
   }
 
@@ -535,16 +628,16 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
 
   // Fallback: draw horizontal strips whose edges follow the warped quad —
   // an affine approximation of the bilinear corner warp, good enough for
-  // these small offsets. The white stroke uses the sprite's own alpha as a
-  // cached silhouette, drawn around a circle under the gif.
+  // these small offsets. The state-colored stroke uses the sprite's own alpha
+  // as a cached silhouette, drawn around a circle under the gif.
   function drawJelly2D(state) {
     const { ctx, fw, fh, sheet, pad } = state;
     if (!ctx) return;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     if (!sheet.complete || !sheet.naturalWidth) return;
+    // Draw one exact sequence frame. Blending neighboring images makes the
+    // outline read as multiple offset earrings while the dial is moving.
     const index = ((Math.floor(state.frameF) % state.count) + state.count) % state.count;
-    const next = (index + 1) % state.count;
-    const frameMix = ((state.frameF % 1) + 1) % 1;
     const [tl, tr, bl, br] = state.corners;
     const strips = 8;
     const sh = fh / strips;
@@ -563,22 +656,9 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         drawWarpedStrips(ctx, silhouette, fw, sh, strips, tl, tr, bl, br,
           Math.cos(a) * stroke, Math.sin(a) * stroke, 0, 0);
       }
-      // second silhouette crossfaded in, matching the blended body frames
-      const silhouetteB = buildSilhouette(state, next);
-      ctx.globalAlpha = frameMix;
-      for (let t = 0; t < STROKE_TAPS_2D; t += 1) {
-        const a = (t / STROKE_TAPS_2D) * Math.PI * 2;
-        drawWarpedStrips(ctx, silhouetteB, fw, sh, strips, tl, tr, bl, br,
-          Math.cos(a) * stroke, Math.sin(a) * stroke, 0, 0);
-      }
-      ctx.globalAlpha = 1;
     }
     drawWarpedStrips(ctx, sheet, fw, sh, strips, tl, tr, bl, br, 0, 0,
       (index % state.cols) * fw, Math.floor(index / state.cols) * fh);
-    ctx.globalAlpha = frameMix;
-    drawWarpedStrips(ctx, sheet, fw, sh, strips, tl, tr, bl, br, 0, 0,
-      (next % state.cols) * fw, Math.floor(next / state.cols) * fh);
-    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
@@ -606,11 +686,12 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     }
   }
 
-  // Cached white-tinted frame sprites via their alpha (source-in), small
-  // two-slot cache so the crossfade can pull the floor frame and the next.
+  // Cached tinted frame sprites via their alpha (source-in), small two-slot
+  // cache so the crossfade can pull the floor frame and the next.
   function buildSilhouette(state, index) {
-    if (!state.silhouettes) {
+    if (!state.silhouettes || state.silhouetteColor !== state.renderedStrokeColor) {
       state.silhouettes = new Map();
+      state.silhouetteColor = state.renderedStrokeColor;
     }
     let entry = state.silhouettes.get(index);
     if (!entry) {
@@ -624,7 +705,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       const sy = Math.floor(index / cols) * fh;
       silCtx.drawImage(sheet, sx, sy, fw, fh, 0, 0, fw, fh);
       silCtx.globalCompositeOperation = "source-in";
-      silCtx.fillStyle = "#ffffff";
+      silCtx.fillStyle = state.renderedStrokeColor || "#ffffff";
       silCtx.fillRect(0, 0, fw, fh);
       entry = canvas;
       state.silhouettes.set(index, entry);
@@ -647,10 +728,12 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     attachDrag(state, hook, null);
 
     state.update = (dt, now) => {
+      syncBoardScale(state);
       // scale eases toward its target: up while dragged, back down when placed
       state.renderedScale += (state.scaleTarget - state.renderedScale) *
         Math.min(1, SCALE_EASE * dt);
       state.scale = state.renderedScale;
+      state.effLength = state.length * state.renderedScale;
 
       if (!state.dragging) {
         // smooth snap onto the current node: fast approach, ease-out settle
@@ -687,7 +770,10 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
   requestAnimationFrame(tick);
 
   window.addEventListener("resize", () => {
-    for (const { state } of items) state.renderPivot();
+    for (const { state } of items) {
+      syncBoardScale(state);
+      state.renderPivot();
+    }
   });
 
   return { create, createJelly, nodePoint, nearestNode };

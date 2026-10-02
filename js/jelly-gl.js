@@ -1,20 +1,20 @@
 // WebGL renderer for the jelly earring.
 // Draws the whole frame as one quad whose 4 corner points carry small
 // offsets (a bilinear warp), plus the whole quad rotates around the pivot
-// (gif top-middle). The canvas is padded around the frame so a white
-// silhouette stroke (the sprite's own alpha, drawn TAPS times around a
-// circle of state.stroke radius) can grow outside the gif without clipping.
+// (gif top-middle). The canvas is padded around the frame so a tinted
+// silhouette stroke (the sprite's own alpha, densely sampled around a circle
+// of state.stroke radius) can grow outside the gif without clipping.
 //
 // window.JellyGL.create(canvas, frames) -> draw(state) | null
 // state must expose: corners [{x, y} x4], quadAngle (whole-quad rotation; the
 // frame sequence itself is owned by the dial in js/dangle.js), stroke,
-// frameF, fw, fh, cols, count, sheet
+// strokeRgb, frameF, fw, fh, cols, count, sheet
 window.JellyGL = (() => {
   const MESH = 8; // grid subdivisions per side; smooths the bilinear warp
-  const TAPS = 16; // outline passes around the circle; more = smoother edge
+  const TAPS = 32;
   const TAP_DIRS = Array.from({ length: TAPS }, (_, i) => {
-    const a = (i / TAPS) * Math.PI * 2;
-    return [Math.cos(a), Math.sin(a)];
+    const angle = (i / TAPS) * Math.PI * 2;
+    return [Math.cos(angle), Math.sin(angle)];
   });
 
   const VERT = `
@@ -28,10 +28,8 @@ window.JellyGL = (() => {
     uniform float uFw;
     uniform float uFh;
     uniform vec2 uFrameOrigin;
-    uniform vec2 uFrameOriginB;
     uniform vec2 uSheetSize;
     varying vec2 vUv;
-    varying vec2 vUvB;
     void main() {
       // bilinear warp: corners are TL, TR, BL, BR offsets from rest
       float u = aUv.x;
@@ -44,10 +42,9 @@ window.JellyGL = (() => {
       float c = cos(uAngle);
       float s = sin(uAngle);
       p = mat2(c, s, -s, c) * p;
-      p += uOffset; // screen-space outline pass offset
-      p += uPad; // shift into padded canvas space (frame top-middle = pivot)
+      p += uOffset;
+      p += uPad;
       vUv = (uFrameOrigin + aUv * vec2(uFw, uFh)) / uSheetSize;
-      vUvB = (uFrameOriginB + aUv * vec2(uFw, uFh)) / uSheetSize;
       gl_Position = vec4(p.x / (uCanvas.x * 0.5), 1.0 - 2.0 * p.y / uCanvas.y, 0.0, 1.0);
     }
   `;
@@ -55,18 +52,19 @@ window.JellyGL = (() => {
   const FRAG = `
     precision mediump float;
     varying vec2 vUv;
-    varying vec2 vUvB;
     uniform sampler2D uTex;
-    uniform float uMix;
     uniform float uWhite;
+    uniform vec3 uStrokeColor;
     void main() {
-      // sequence smoothness: blend the two frames the dial sits between,
-      // so slow dial drift eases through frames instead of snapping
-      vec4 ta = texture2D(uTex, vUv);
-      vec4 tb = texture2D(uTex, vUvB);
-      vec4 t = mix(ta, tb, uMix);
-      vec3 rgb = mix(t.rgb, vec3(1.0), uWhite);
-      gl_FragColor = vec4(rgb, t.a);
+      // Every dial index is drawn as one complete image; there is no
+      // interpolation with its neighboring sequence frame.
+      vec4 t = texture2D(uTex, vUv);
+      // The outline uses a binary alpha cutout, so its repeated silhouette
+      // passes union into an opaque contour rather than translucent texture.
+      // Alpha-dilation rationale: https://stackoverflow.com/questions/69946718/variable-width-outline-effect-around-a-texture-in-2d
+      float outlineAlpha = t.a > 0.08 ? 1.0 : 0.0;
+      float alpha = mix(t.a, outlineAlpha, uWhite);
+      gl_FragColor = vec4(mix(t.rgb, uStrokeColor, uWhite), alpha);
     }
   `;
 
@@ -129,9 +127,9 @@ window.JellyGL = (() => {
     const u = (name) => gl.getUniformLocation(program, name);
     const loc = {
       corners: u("uCorners"), angle: u("uAngle"), offset: u("uOffset"),
-      white: u("uWhite"), pad: u("uPad"), canvasSize: u("uCanvas"),
+      white: u("uWhite"), strokeColor: u("uStrokeColor"),
+      pad: u("uPad"), canvasSize: u("uCanvas"),
       fw: u("uFw"), fh: u("uFh"), frameOrigin: u("uFrameOrigin"),
-      frameOriginB: u("uFrameOriginB"), mix: u("uMix"),
       sheetSize: u("uSheetSize"), tex: u("uTex"),
     };
     gl.uniform1f(loc.fw, frames.fw);
@@ -162,25 +160,24 @@ window.JellyGL = (() => {
     // draw(state): state.corners [{x,y} x4] (TL, TR, BL, BR, px offsets),
     // state.angle, state.stroke (outline radius px; 0 = none), state.frameF,
     // state.cols, state.count, state.fw, state.fh, state.sheet
-    return function draw(state) {
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-      const sheet = state.sheet;
-      if (!sheet.complete || !sheet.naturalWidth) return;
+    const draw = function draw(state) {
+      // file:// pages taint WebGL textures (cross-origin image data); a throw
+      // here would kill the shared rAF loop every frame, so mark the renderer
+      // failed and let dangle.js fall back to the canvas-2D path instead.
+      try {
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        const sheet = state.sheet;
+        if (!sheet.complete || !sheet.naturalWidth) return;
       if (!uploaded) uploadTexture(sheet);
 
-      // fractional frame index: floor frame + the next one, blended by the
-      // fractional part (motion-blur feel; kills the integer frame snapping)
+      // The dial may be fractional, but rendering always clips to one exact
+      // sequence image. This keeps the moving colored contour crisp.
       const frameF = ((state.frameF % state.count) + state.count) % state.count;
       const index = Math.floor(frameF);
-      const next = (index + 1) % state.count;
       gl.uniform2f(loc.frameOrigin,
         (index % state.cols) * state.fw,
         Math.floor(index / state.cols) * state.fh);
-      gl.uniform2f(loc.frameOriginB,
-        (next % state.cols) * state.fw,
-        Math.floor(next / state.cols) * state.fh);
-      gl.uniform1f(loc.mix, frameF - index);
       gl.uniform2f(loc.sheetSize, sheet.naturalWidth, sheet.naturalHeight);
       for (let i = 0; i < 4; i += 1) {
         cornerBuf[i * 2] = state.corners[i].x;
@@ -191,10 +188,10 @@ window.JellyGL = (() => {
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, texture);
 
-      // white silhouette stroke under the gif: the sprite's own alpha drawn
-      // TAPS times around a circle of state.stroke radius, pure white
+      // Render the alpha-only silhouette under the exact source image.
       const stroke = state.stroke || 0;
       if (stroke > 0.4) {
+        gl.uniform3fv(loc.strokeColor, state.strokeRgb || [1, 1, 1]);
         gl.uniform1f(loc.white, 1);
         for (let i = 0; i < TAPS; i += 1) {
           gl.uniform2f(loc.offset, TAP_DIRS[i][0] * stroke, TAP_DIRS[i][1] * stroke);
@@ -204,7 +201,14 @@ window.JellyGL = (() => {
         gl.uniform1f(loc.white, 0);
       }
       gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+      } catch (err) {
+        draw.failed = true;
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      }
     };
+    draw.failed = false;
+    return draw;
   }
 
   return { create, MESH };
