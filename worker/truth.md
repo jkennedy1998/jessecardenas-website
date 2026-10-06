@@ -30,6 +30,10 @@
 - j-quote: "material is on there not materials . jesse says its on there"
 - interpretation: the live Stripe Product's customer-facing materials use the exact metadata key `Material`.
 
+### 2026-10-06-studio-shared-password
+- j-quote: "we could do that, or we could do a password only jesse and i know. that would be nice and easy"
+- interpretation: Catalog Studio access is a single shared password (HTTP Basic Auth) known only to Jesse and the operator, not a Cloudflare Access email/OTP login.
+
 ### 2026-04-02-product-fields
 - j-quote: "stripe item should have the materials as metaddata, the price should be gotten from there, the description and title as well."
 - interpretation: `Material` comes from Product metadata; name, description, and default Price come from Stripe's normal Product and Price fields.

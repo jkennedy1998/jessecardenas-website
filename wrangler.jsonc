@@ -4,9 +4,12 @@
   "main": "worker/index.mjs",
   "workers_dev": false,
   "compatibility_date": "2025-04-01",
+  "routes": [
+    { "pattern": "jessecardenas.com/api/*", "zone_name": "jessecardenas.com" },
+    { "pattern": "jessecardenas.com/studio/*", "zone_name": "jessecardenas.com" }
+  ],
   "vars": {
-    "SITE_ORIGIN": "https://jessecardenas.com",
-    "ADMIN_EMAIL": "Jeshcaprints@gmail.com"
+    "SITE_ORIGIN": "https://jessecardenas.com"
   },
   "durable_objects": {
     "bindings": [

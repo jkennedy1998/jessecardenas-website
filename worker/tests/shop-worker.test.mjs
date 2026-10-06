@@ -43,7 +43,7 @@ test('Studio publishes Product-ID inventory and checkout reserves pair stock', {
   };
 
   try {
-    const env = { STRIPE_SECRET_KEY: 'test', SITE_ORIGIN: 'https://jessecardenas.com', ADMIN_EMAIL: 'jesse@example.com' };
+    const env = { STRIPE_SECRET_KEY: 'test', SITE_ORIGIN: 'https://jessecardenas.com', STUDIO_PASSWORD: 'let-us-in' };
     const lock = new InventoryLock({ storage }, env);
     await lock.fetch(new Request('https://jessecardenas.com/api/studio/listings/prod_purple', {
       method: 'PUT',
@@ -71,14 +71,15 @@ test('Studio publishes Product-ID inventory and checkout reserves pair stock', {
       INVENTORY_LOCK: { idFromName: () => 'catalog', get: () => ({ fetch: (request) => lock.fetch(request) }) },
     };
     const allowed = await app.fetch(new Request('https://jessecardenas.com/api/studio/listings', {
-      headers: { 'cf-access-authenticated-user-email': 'jesse@example.com' },
+      headers: { authorization: `Basic ${btoa('jesse:let-us-in')}` },
     }), workerEnv);
     const originalError = console.error;
     console.error = () => {};
     const denied = await app.fetch(new Request('https://jessecardenas.com/api/studio/listings'), workerEnv);
     console.error = originalError;
     assert.equal(allowed.status, 200);
-    assert.equal(denied.status, 403);
+    assert.equal(denied.status, 401);
+    assert.equal(denied.headers.get('www-authenticate'), 'Basic realm="Studio"');
   } finally {
     globalThis.fetch = originalFetch;
   }

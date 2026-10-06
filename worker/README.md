@@ -6,8 +6,9 @@ metadata only holds `Material`; it is not used for inventory.
 
 ## Catalog Studio
 
-`/studio/` is Jesse's private listing control surface. Each Stripe Product can
-be given:
+`/studio/` is Jesse's private listing control surface, gated by a shared
+password (HTTP Basic Auth) known only to Jesse and the operator — no account
+or login flow. Each Stripe Product can be given:
 
 - **available individual earrings** — current sellable stock
 - **approved graphic** — a key from `source/earrings/graphics.json`
@@ -25,11 +26,11 @@ Worker verifies Stripe's signature before changing stock.
 
 ## deploy
 
-1. In Cloudflare, proxy `jessecardenas.com`, then deploy this Worker to
-   `jessecardenas.com/api/*`:
+1. In Cloudflare, proxy `jessecardenas.com`, then deploy this Worker
+   (`wrangler.jsonc` already declares both routes):
 
    ```sh
-   npx wrangler deploy --route 'jessecardenas.com/api/*'
+   npx wrangler deploy
    ```
 
 2. Set secrets; never put them in Git or browser code:
@@ -37,21 +38,19 @@ Worker verifies Stripe's signature before changing stock.
    ```sh
    npx wrangler secret put STRIPE_SECRET_KEY
    npx wrangler secret put STRIPE_WEBHOOK_SECRET
+   npx wrangler secret put STUDIO_PASSWORD
    ```
 
 3. `wrangler.jsonc` sets the non-secret Worker variables:
    - `SITE_ORIGIN`: `https://jessecardenas.com`
-   - `ADMIN_EMAIL`: Jesse's exact email address
+   - `routes`: covers both `jessecardenas.com/api/*` and `jessecardenas.com/studio/*`
 
-4. Create a Cloudflare Access application for both:
-   - `https://jessecardenas.com/studio/*`
-   - `https://jessecardenas.com/api/studio/*`
+   The Worker requires `STUDIO_PASSWORD` (HTTP Basic Auth, any username) for
+   both the `/studio/*` page and `/api/studio/*` endpoints before anything is
+   served or mutated. `workers_dev` is disabled so this protection is not
+   bypassable through a `workers.dev` hostname.
 
-   Allow only Jesse's email. The Worker verifies the Access email again for
-   every Studio API request. `workers_dev` is disabled so this protection is
-   not bypassable through a `workers.dev` hostname.
-
-5. In Stripe, add `https://jessecardenas.com/api/webhooks/stripe` for:
+4. In Stripe, add `https://jessecardenas.com/api/webhooks/stripe` for:
    - `checkout.session.completed`
    - `checkout.session.async_payment_succeeded`
    - `checkout.session.expired`

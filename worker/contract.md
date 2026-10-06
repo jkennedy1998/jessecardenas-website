@@ -5,15 +5,16 @@
 
 ## owns
 - Product-ID-bound inventory, publication, and graphic-assignment records
-- Catalog Studio API and Access-email authorization check
+- Catalog Studio API and shared-password authorization check
 - serialized stock reservations, releases, and paid-order confirmation
 - Stripe catalog projection, Checkout Session creation, signature verification, and event dedupe
+- gating the static `/studio/*` page behind the same shared password, by proxying it from the Worker route
 
 ## does not own
 - Stripe Product, Price, or customer authoring
 - static shop and Studio rendering
 - prepared visual assets or future video/media processing
-- Cloudflare Access policy setup or deployment credentials
+- Cloudflare DNS/zone or deployment credentials
 
 ## children-encapsulations
 - none
@@ -33,7 +34,6 @@
 ## dependencies
 - Stripe API: Products, Prices, Checkout Sessions, and signed webhooks
 - Cloudflare Durable Objects: persistent inventory, reservation, and webhook-dedupe state
-- Cloudflare Access: authenticated Studio identity header
 
 ## exposed interfaces
 ### getCatalog — return sellable Product and inventory joins
@@ -83,7 +83,7 @@ via: rpc `POST /api/webhooks/stripe`
   - validates pair quantities reserve two individual units.
 - studio authorization contract
   - light
-  - validates only the Cloudflare Access email may mutate listing state.
+  - validates only the shared `STUDIO_PASSWORD` may mutate listing state.
 
 ## data
 - none

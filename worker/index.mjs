@@ -12,7 +12,7 @@ const json = (value, status = 200, headers = {}) => new Response(JSON.stringify(
   status,
   headers: { 'content-type': 'application/json; charset=utf-8', ...headers },
 });
-const error = (status, message) => json({ error: message }, status);
+const error = (status, message, headers = {}) => json({ error: message }, status, headers);
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 function corsHeaders(request, env) {
@@ -32,10 +32,17 @@ function withCors(response, request, env) {
   return new Response(response.body, { status: response.status, headers });
 }
 
-function requireStudioAccess(request, env) {
-  const email = request.headers.get('cf-access-authenticated-user-email')?.toLowerCase();
-  if (!env.ADMIN_EMAIL || email !== env.ADMIN_EMAIL.toLowerCase()) {
-    throw new HttpError(403, 'Studio access is required.');
+function parseBasicAuth(request) {
+  const header = request.headers.get('authorization') || '';
+  if (!header.startsWith('Basic ')) return null;
+  const separator = atob(header.slice(6)).indexOf(':');
+  return separator === -1 ? null : atob(header.slice(6)).slice(separator + 1);
+}
+
+async function requireStudioAccess(request, env) {
+  const password = parseBasicAuth(request);
+  if (!env.STUDIO_PASSWORD || !password || !(await equal(password, env.STUDIO_PASSWORD))) {
+    throw new HttpError(401, 'Studio access requires the shared password.');
   }
 }
 
@@ -328,18 +335,22 @@ export default {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(request, env) });
     try {
-      const isStudio = url.pathname.startsWith('/api/studio/');
-      if (isStudio) requireStudioAccess(request, env);
+      const isStudioPage = url.pathname === '/studio' || url.pathname.startsWith('/studio/');
+      const isStudioApi = url.pathname.startsWith('/api/studio/');
+      if (isStudioPage || isStudioApi) await requireStudioAccess(request, env);
+      if (isStudioPage) return fetch(request);
       const handled = request.method === 'GET' && url.pathname === '/api/catalog'
         || request.method === 'POST' && ['/api/checkout', '/api/webhooks/stripe'].includes(url.pathname)
-        || isStudio;
+        || isStudioApi;
       const response = handled
         ? await env.INVENTORY_LOCK.get(env.INVENTORY_LOCK.idFromName('jesse-catalog')).fetch(request)
         : error(404, 'Not found.');
       return withCors(response, request, env);
     } catch (cause) {
       console.error(cause);
-      return withCors(error(cause.status || 500, cause.status ? cause.message : 'The shop is temporarily unavailable.'), request, env);
+      const status = cause.status || 500;
+      const headers = status === 401 ? { 'www-authenticate': 'Basic realm="Studio"' } : {};
+      return withCors(error(status, cause.status ? cause.message : 'The shop is temporarily unavailable.', headers), request, env);
     }
   },
 };

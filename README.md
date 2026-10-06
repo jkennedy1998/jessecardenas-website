@@ -7,7 +7,7 @@ private Catalog Studio.
 
 - **Stripe** owns Product title, description, `Material` metadata, active
   status, and default Price.
-- **Catalog Studio** (`/studio/`, protected by Cloudflare Access) owns available
+- **Catalog Studio** (`/studio/`, protected by a shared password) owns available
   individual-earring stock, publication, and the prepared graphic selected for
   each Stripe Product ID.
 - **source/earrings/graphics.json** owns prepared art keyed by stable graphic

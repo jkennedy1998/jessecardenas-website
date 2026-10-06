@@ -1,5 +1,5 @@
-// Private Catalog Studio. Cloudflare Access protects /studio/ and the Worker
-// verifies the same email before it accepts these inventory writes.
+// Private Catalog Studio. The Worker gates /studio/ and its API behind a
+// shared password (HTTP Basic Auth) known only to Jesse and the operator.
 window.Studio = (() => {
   const status = document.querySelector('.studio-status');
   const list = document.querySelector('.studio-list');
