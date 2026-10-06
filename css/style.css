@@ -442,11 +442,11 @@ body.has-selection.is-selling-open .shop-panel {
   --card-slide-x: 0px;
   position: fixed;
   z-index: 90;
-  width: min(260px, calc(100vw - 2rem));
-  padding: 0.6rem 0.7rem;
+  width: min(380px, calc(100vw - 2rem));
+  padding: 0.85rem 1rem;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   overflow-y: auto;
   background: #ffffff;
   color: var(--card-dark, var(--site-ink, #1a1a1a));
@@ -495,8 +495,8 @@ body.has-selection.is-selling-open .shop-panel {
 
 .earring-hover-card h3 {
   margin: 0 0 0.25rem;
-  font-size: 0.8rem;
-  line-height: 1.15;
+  font-size: 0.9rem;
+  line-height: 1.2;
 }
 
 .earring-hover-materials,
@@ -512,15 +512,76 @@ body.has-selection.is-selling-open .shop-panel {
 
 .earring-hover-description {
   margin-top: 0.4rem;
-  font-size: 0.68rem;
-  line-height: 1.35;
+  font-size: 0.76rem;
+  line-height: 1.4;
 }
 
 .earring-hover-price {
   margin-top: 0.45rem;
-  font-size: 0.74rem;
+  font-size: 0.8rem;
   font-weight: 650;
 }
+
+.shop-status {
+  position: absolute;
+  inset: auto 1rem 1.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--site-ink);
+}
+
+/* ---------- private catalog studio ---------- */
+
+.studio-page { background: #f7f4ee; }
+
+.studio {
+  width: min(100% - 2rem, 760px);
+  margin: 0 auto;
+  padding: 3rem 0 5rem;
+}
+
+.studio-header { margin-bottom: 2rem; }
+.studio-header a { color: inherit; font-size: 0.8rem; }
+.studio-header h1 { margin-top: 1rem; font-size: clamp(2rem, 7vw, 3.4rem); line-height: 0.95; }
+.studio-header p { max-width: 42rem; margin-top: 1rem; line-height: 1.5; }
+.studio-status { min-height: 1.5rem; margin-bottom: 1rem; font-size: 0.85rem; }
+.studio-status[data-error="true"] { color: #a03030; }
+.studio-list { display: grid; gap: 1rem; }
+
+.studio-card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.25rem;
+  background: #ffffff;
+  border-radius: 1.25rem;
+  box-shadow: 0 8px 24px rgba(38, 18, 49, 0.1);
+}
+
+.studio-card h2 { font-size: 1.1rem; }
+.studio-detail, .studio-held { font-size: 0.78rem; line-height: 1.4; opacity: 0.75; }
+.studio-card label { display: grid; gap: 0.35rem; font-size: 0.78rem; font-weight: 650; }
+.studio-card input[type="number"], .studio-card select {
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid rgba(38, 18, 49, 0.25);
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: inherit;
+  font: inherit;
+}
+.studio-card .studio-check { display: flex; align-items: center; gap: 0.5rem; }
+.studio-card button {
+  justify-self: start;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  background: var(--site-ink);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.studio-card button:disabled { opacity: 0.5; cursor: wait; }
 
 /* ---------- earring card / purchase controls ---------- */
 

@@ -1,16 +1,13 @@
-// Cart + checkout. Selected earrings live here; the shop panel
-// (js/components.js) renders them. Stock truth stays in entry.md `## quantity`
-// (maxSingles); a pair consumes two singles — this vendor sells pieces that
-// can be worn asymmetrically, so singles and pairs both exist.
-// Atomic reservation, stripe sessions, and sold-out delisting move into the
-// cloudflare worker later.
+// Cart + checkout. The Worker supplies catalog facts from Stripe; this client
+// only holds the customer's short-lived selection. A pair consumes two of the
+// product's individual units.
 window.SHOP_CONFIG = {
-  // Absent locally -> checkout logs the order payload instead of posting.
+  catalogEndpoint: "/api/catalog",
   checkoutEndpoint: "/api/checkout",
 };
 
 window.Shop = (() => {
-  // slug -> { slug, title, unitPrice, mode, quantity, maxSingles }
+  // visual slug -> { productId, slug, title, unitPrice, mode, quantity, maxSingles }
   // mode: "single" | "pair"; quantity counts units of that mode; a pair
   // consumes 2 singles of stock. unitPrice is per single.
   const items = new Map();
@@ -27,6 +24,7 @@ window.Shop = (() => {
       items.delete(entry.slug);
     } else {
       items.set(entry.slug, {
+        productId: entry.productId,
         slug: entry.slug,
         title: entry.title || entry.slug,
         unitPrice: entry.price,
@@ -80,7 +78,7 @@ window.Shop = (() => {
     if (!state.list.length) return;
     const payload = {
       items: state.list.map((item) => ({
-        slug: item.slug,
+        productId: item.productId,
         mode: item.mode,
         quantity: item.quantity,
         singles: item.quantity * (item.mode === "pair" ? 2 : 1),
@@ -94,9 +92,11 @@ window.Shop = (() => {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-      console.log("[shop] checkout response", response.status, payload);
-    } catch {
-      console.log("[shop] stub checkout payload", payload);
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.url) throw new Error(result.error || "Checkout could not start.");
+      window.location.assign(result.url);
+    } catch (cause) {
+      window.alert(cause.message || "Checkout could not start.");
     }
   }
 

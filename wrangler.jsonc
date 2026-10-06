@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jessecardenas-shop",
+  "main": "worker/index.mjs",
+  "workers_dev": false,
+  "compatibility_date": "2025-04-01",
+  "vars": {
+    "SITE_ORIGIN": "https://jessecardenas.com",
+    "ADMIN_EMAIL": "Jeshcaprints@gmail.com"
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "INVENTORY_LOCK", "class_name": "InventoryLock" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["InventoryLock"] }
+  ]
+}

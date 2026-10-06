@@ -163,10 +163,8 @@ function buildEarringHoverCard(stage) {
     // stable while a sequence changes or the earring swings.
     const scale = state.renderedScale;
     const imageWidth = state.canvas.width * scale;
-    const imageHeight = state.canvas.height * scale;
     const center = boardRect.left + state.x * boardRect.width;
     const centerY = boardRect.top + state.y * boardRect.height + state.fh * scale / 2;
-    card.style.height = `${Math.min(imageHeight * 0.86, window.innerHeight - 24)}px`;
     const cardWidth = card.offsetWidth;
     const cardHeight = card.offsetHeight;
     // The board, not the browser viewport, determines the card side. This
@@ -206,7 +204,10 @@ function buildEarringHoverCard(stage) {
       card.style.setProperty("--card-mid", cardPalette.mid);
       card.style.setProperty("--card-light", cardPalette.light);
       card.classList.toggle("is-selected", window.Shop.has(entry.slug));
-      place(state);
+      // The animation updates hover state every frame. Reposition only on a
+      // new hover (or while physically dragging) so text never jitters as
+      // the earring turns through its image sequence.
+      if (changedEarring || state.dragging) place(state);
       card.classList.add("is-active");
     },
     hide() {
@@ -480,16 +481,47 @@ function buildShopPanel(panel) {
   renderPanel();
 }
 
-function initEarringsPage() {
+async function currentListings() {
+  const response = await fetch(window.SHOP_CONFIG.catalogEndpoint, { cache: "no-store" });
+  const catalog = await response.json().catch(() => ({}));
+  if (!response.ok || !Array.isArray(catalog.listings)) {
+    throw new Error(catalog.error || "The shop is temporarily unavailable.");
+  }
+  const visuals = window.EARRING_VISUALS || {};
+  return catalog.listings.flatMap((listing) => {
+    const visual = visuals[listing.graphicKey];
+    if (!visual) {
+      console.warn(`[shop] no graphic mapped for Stripe product: ${listing.productId}`);
+      return [];
+    }
+    return [{ ...listing, ...visual }];
+  });
+}
+
+function showShopStatus(stage, text) {
+  const status = document.createElement("p");
+  status.className = "shop-status";
+  status.textContent = text;
+  stage?.append(status);
+}
+
+async function initEarringsPage() {
   const board = document.querySelector(".earring-board");
   const container = document.querySelector(".slices");
   const stage = document.querySelector(".earring-stage");
-  const hoverCard = stage ? buildEarringHoverCard(stage) : null;
-  const entries = window.EARRINGS_PAGE_SOURCE || [];
-  if (!entries.length) {
-    if (container) container.innerHTML = '<p class="slice-empty">no earrings listed yet — check back soon.</p>';
+  let entries;
+  try {
+    entries = await currentListings();
+  } catch {
+    showShopStatus(stage, "the shop is temporarily unavailable — please try again soon.");
     return;
   }
+  if (!entries.length) {
+    if (container) container.innerHTML = '<p class="slice-empty">no earrings listed yet — check back soon.</p>';
+    else showShopStatus(stage, "no earrings listed yet — check back soon.");
+    return;
+  }
+  const hoverCard = stage ? buildEarringHoverCard(stage) : null;
 
   const usedNodes = new Set(
     entries.map((entry) => entry.node).filter((node) => Number.isInteger(node)),
@@ -578,5 +610,5 @@ function renderNodeMarkers(board) {
 document.addEventListener("DOMContentLoaded", () => {
   renderHeader();
   renderFooter();
-  initEarringsPage();
+  void initEarringsPage();
 });
