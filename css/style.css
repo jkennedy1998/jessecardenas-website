@@ -150,6 +150,11 @@ main { flex: 1; }
 
 .earring-board {
   position: relative;
+  /* Stacking context for the whole board: the shadow sits at z -1 over the
+     grate, the hover card at 90, and a hovered earring at 100 above it. The
+     board itself paints above the purchase panel (z 10) so a hovered
+     earring can still lean over the panel edge as before. */
+  z-index: 20;
   width: min(92vw, 780px);
   aspect-ratio: 1068 / 1084;
   margin: 0 auto;
@@ -430,13 +435,15 @@ body.has-selection.is-selling-open .shop-panel {
 }
 
 /* contact shadow under the photo (js/dangle.js owns drawing + masking);
-   alpha is masked to the grate png so it never leaves the wire grid */
+   alpha is masked to the grate png so it never leaves the wire grid.
+   Lives on the board (js/dangle.js reparents it) at negative z: above the
+   board's own grate background, under every earring and the hover card. */
 .earring-jelly-shadow {
   position: absolute;
   top: 0;
   transform-origin: 50% 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: -1;
 }
 
 /* The one fixed hover card is a white, borderless companion to the white

@@ -536,7 +536,11 @@ async function initEarringsPage() {
     else showShopStatus(stage, "no earrings listed yet — check back soon.");
     return;
   }
-  const hoverCard = stage ? buildEarringHoverCard(stage) : null;
+  // The hover card lives inside the board's stacking context (the board is
+  // z 20 over the purchase panel): a hovered earring at z 100 must rise
+  // above the card (the engulf look) while the card stays above every
+  // unhovered earring (z 0..9) and the board-level contact shadows (z -1).
+  const hoverCard = board ? buildEarringHoverCard(board) : null;
 
   const usedNodes = new Set(
     entries.map((entry) => entry.node).filter((node) => Number.isInteger(node)),

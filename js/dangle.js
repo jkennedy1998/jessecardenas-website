@@ -244,6 +244,13 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       state.dangle.style.zIndex = String(state.hovered
         ? HOVER_DEPTH
         : Math.round((1 - state.y) * BASE_DEPTH_RANGE));
+      // The shadow hangs off the board, not the dangle, so it carries its
+      // own position and scale (see the createJelly shadow block).
+      if (state.shadow) {
+        state.shadow.style.left = `calc(${state.x * 100}% - ${state.shadowOffX}px)`;
+        state.shadow.style.top = `calc(${state.y * 100}% - ${state.shadowOffY}px)`;
+        state.shadow.style.scale = String(state.renderedScale);
+      }
     };
     state.effLength = length * initialScale;
     return state;
@@ -291,15 +298,24 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     // owns it because it needs per-frame state (frame index, position,
     // scale, swing) to place and mask the contact shadow. Showcase embeds
     // render straight onto the page, so they skip the grate-masked shadow.
+    // It is parented to the BOARD, not the dangle: the hovered dangle rises
+    // above the hover card (the engulf look), and a shadow inside that
+    // stacking context would ride along and paint over the card. On the
+    // board it sits at z -1 — over the grate png, under every earring.
     let shadowCanvas = null;
     if (shadow) {
+      const shadowPad = Math.max(0, (canvas.width - frames.fw) / 2);
       shadowCanvas = document.createElement("canvas");
       shadowCanvas.className = "earring-jelly-shadow";
       shadowCanvas.width = canvas.width;
       shadowCanvas.height = canvas.height;
-      shadowCanvas.style.left = canvas.style.left;
-      shadowCanvas.style.top = canvas.style.top;
-      canvas.parentNode.insertBefore(shadowCanvas, canvas);
+      // Scale about the same point the dangle's scale used — the hang point
+      // at canvas coords (fw/2 + pad, pad) — so the drop distance stays
+      // proportional while the piece grows and shrinks.
+      shadowCanvas.style.transformOrigin = `${frames.fw / 2 + shadowPad}px ${shadowPad}px`;
+      state.shadowOffX = frames.fw / 2 + shadowPad;
+      state.shadowOffY = shadowPad;
+      state.hang.appendChild(shadowCanvas);
     }
 
     const sheet = new Image();
