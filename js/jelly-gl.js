@@ -208,6 +208,17 @@ window.JellyGL = (() => {
       }
     };
     draw.failed = false;
+
+    // A lost GPU context (driver reset, or the browser reclaiming one of many
+    // live WebGL contexts under memory pressure — each earring holds its own)
+    // never throws: every gl call after loss just silently no-ops. Without
+    // this listener the canvas goes blank forever with no error, since the
+    // try/catch above only catches thrown exceptions. Treat loss exactly like
+    // a caught failure so dangle.js swaps in its canvas-2D fallback.
+    canvas.addEventListener("webglcontextlost", (event) => {
+      event.preventDefault();
+      draw.failed = true;
+    });
     return draw;
   }
 
