@@ -562,21 +562,37 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
   }
 
   function drawJelly(state) {
-    if (state.draw && !state.draw.failed) { state.draw(state); return; }
-    if (state.draw && state.draw.failed && !state.ctx) {
-      // WebGL tainted the canvas (file:// pages) — a 2D context can't be
-      // created on it, so swap in a clean canvas and continue on the 2D path.
-      const two = document.createElement("canvas");
-      two.className = state.canvas.className;
-      two.width = state.canvas.width;
-      two.height = state.canvas.height;
-      two.style.left = state.canvas.style.left;
-      two.style.top = state.canvas.style.top;
-      state.canvas.replaceWith(two);
-      state.canvas = two;
-      state.ctx = two.getContext("2d");
+    // The WebGL path (jelly-gl.js) already guards its own draw() and leaves
+    // the canvas blankly cleared on failure as an intermediate step, relying
+    // on the swap below to repaint it via the 2D path right after. That swap
+    // had no guard of its own: if it ever threw (a mid-reload sheet, a
+    // second context loss landing mid-swap, canvas.getContext returning
+    // null), the exception used to propagate out of state.update and the
+    // earring was left stuck on that blank clear forever. Skip this one
+    // frame's draw instead — whatever was already painted stays on screen —
+    // and let the next frame retry rather than giving up for good.
+    try {
+      if (state.draw && !state.draw.failed) { state.draw(state); return; }
+      if (state.draw && state.draw.failed && !state.ctx) {
+        // WebGL tainted the canvas (file:// pages) — a 2D context can't be
+        // created on it, so swap in a clean canvas and continue on the 2D path.
+        const two = document.createElement("canvas");
+        two.className = state.canvas.className;
+        two.width = state.canvas.width;
+        two.height = state.canvas.height;
+        two.style.left = state.canvas.style.left;
+        two.style.top = state.canvas.style.top;
+        state.canvas.replaceWith(two);
+        state.canvas = two;
+        state.ctx = two.getContext("2d");
+      }
+      drawJelly2D(state);
+    } catch (err) {
+      if (!state.drawErrorLogged) {
+        console.error("[dangle] drawJelly failed, skipping frames until it recovers:", err);
+        state.drawErrorLogged = true;
+      }
     }
-    drawJelly2D(state);
   }
 
   // Contact shadow: black blurred photo silhouette, slightly lower, then
