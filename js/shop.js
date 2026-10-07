@@ -50,7 +50,12 @@ window.Shop = (() => {
     const item = items.get(slug);
     if (!item) return;
     item.mode = mode;
-    item.quantity = Math.min(item.quantity, maxFor(item)) || 1;
+    // `|| 1` here would silently force quantity back up to 1 even when this
+    // mode has zero real stock (maxFor 0) — looking like a valid pair pick
+    // when none exist. The UI disables that option (see shop panel), but
+    // keep the floor honest regardless of how setMode gets called.
+    const limit = maxFor(item);
+    item.quantity = limit > 0 ? Math.min(item.quantity, limit) : 0;
     render();
   }
 

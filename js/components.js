@@ -464,6 +464,9 @@ function buildShopPanel(panel) {
         const option = el("option", "", modeName === "single" ? "single earring" : "pair");
         option.value = modeName;
         option.selected = item.mode === modeName;
+        // Mirror the board's buy-toggle stock check: never offer a pair that
+        // isn't actually in stock once an item is already in the cart.
+        option.disabled = modeName === "pair" && item.maxSingles < 2;
         mode.append(option);
       }
       mode.addEventListener("change", () => window.Shop.setMode(item.slug, mode.value));
