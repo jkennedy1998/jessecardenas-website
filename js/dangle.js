@@ -371,14 +371,17 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       if (state.onHover) state.onHover(null);
     });
 
-    // pickup keeps the hover card and outline alive, including dial rotation.
+    // Pickup keeps the outline alive either way. The hover card only stays up
+    // for a dial swipe (the earring itself holds still, just turning through
+    // its frames) — a full move-drag relocates the piece, so the card would
+    // be anchored to a spot the earring is no longer at; hide it for that.
     state.onDragStart = () => {
       state.hovered = true;
       state.scaleTarget = state.baseScale * HOVER_SCALE;
       state.strokeTarget = STROKE_PX;
       state.syncStrokeColor();
       state.renderPivot();
-      if (state.onHover) state.onHover(state);
+      if (state.onHover) state.onHover(state.dragMode === "dial" ? state : null);
       if (!REDUCED) {
         state.dialVel += PICKUP_KICK * state.wiggleDir;
         state.swingVel += SWING_PICKUP * state.wiggleDir;
@@ -546,7 +549,11 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       drawJelly(state);
       if (state.shadow) drawShadow(state);
       state.renderPivot();
-      if (state.hovered && state.onHover) state.onHover(state);
+      // Same rule every frame: a dial swipe keeps the card up (the earring
+      // stays put), a full move-drag hides it (the earring doesn't).
+      if (state.hovered && state.onHover) {
+        state.onHover(state.dragging && state.dragMode === "move" ? null : state);
+      }
     };
 
     state.renderPivot();
@@ -764,7 +771,18 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
   function tick(now) {
     const dt = Math.min((now - last) / 1000, 1 / 30);
     last = now;
-    for (const item of items) item.update(dt, now);
+    for (const item of items) {
+      try {
+        item.update(dt, now);
+      } catch (err) {
+        // One earring's per-frame update must never take the shared rAF
+        // loop down with it — an uncaught throw here used to stop
+        // requestAnimationFrame(tick) from ever being called again, which
+        // froze/hid every earring on the board, not just the failing one.
+        console.error("[dangle] earring update failed, disabling it:", err);
+        item.update = () => {};
+      }
+    }
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);

@@ -307,9 +307,12 @@ body.has-selection.is-selling-open .shop-panel {
   gap: 1rem;
 }
 
-.shop-name { font-weight: 600; font-size: 0.76rem; letter-spacing: 0.01em; }
+/* One text size across the whole shop panel, matching the board's hover
+   card; weight alone carries the hierarchy (title/price/total heaviest,
+   controls lighter, stock lightest). */
+.shop-name { font-weight: 700; font-size: 0.76rem; letter-spacing: 0.01em; }
 
-.shop-line-price { font-size: 0.72rem; opacity: 0.88; }
+.shop-line-price { font-weight: 700; font-size: 0.76rem; opacity: 0.88; }
 
 .shop-row-controls {
   display: flex;
@@ -328,8 +331,8 @@ body.has-selection.is-selling-open .shop-panel {
   background: var(--active-dark);
   color: #ffffff;
   font: inherit;
-  font-size: 0.65rem;
-  font-weight: 600;
+  font-size: 0.76rem;
+  font-weight: 500;
   padding: 0.5rem 0.75rem;
   cursor: pointer;
 }
@@ -361,9 +364,9 @@ body.has-selection.is-selling-open .shop-panel {
   cursor: pointer;
 }
 
-.shop-qty { min-width: 1.2ch; text-align: center; font-size: 0.72rem; }
+.shop-qty { min-width: 1.2ch; text-align: center; font-weight: 500; font-size: 0.76rem; }
 
-.shop-stock { color: var(--active-light); font-size: 0.62rem; opacity: 1; margin-left: auto; }
+.shop-stock { color: var(--active-light); font-weight: 400; font-size: 0.76rem; opacity: 1; margin-left: auto; }
 
 .shop-remove {
   width: 1.6rem;
@@ -394,7 +397,7 @@ body.has-selection.is-selling-open .shop-panel {
   border-top: 2px solid rgba(255, 255, 255, 0.7);
 }
 
-.shop-total { font-size: 0.88rem; font-weight: 600; }
+.shop-total { font-size: 0.76rem; font-weight: 700; }
 
 .shop-checkout {
   border: none;
@@ -402,7 +405,7 @@ body.has-selection.is-selling-open .shop-panel {
   color: #ffffff;
   border-radius: 999px;
   font: inherit;
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   padding: 0.45rem 0.7rem;
   font-weight: 600;
   cursor: pointer;
