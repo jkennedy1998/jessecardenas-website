@@ -1,5 +1,6 @@
 /* jessecardenas.com — reusable horizontal slices, top bar + bottom bar.
-   No shared typeface system; clean system stack, color via per-entry CSS vars. */
+   One typeface (Josefin Sans) throughout; weight carries hierarchy instead
+   of varying font-size. Color via per-entry CSS vars. */
 
 :root {
   /* Palette sampled from the supplied portrait: ink, peach-orange, gold,
@@ -17,7 +18,7 @@
   --active-dark: var(--site-ink);
   --active-color: var(--active-mid);
   --grate-warm-gray: #eea35f;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-family: "Josefin Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -53,7 +54,7 @@ main { flex: 1; }
 .site-brand {
   color: inherit;
   text-decoration: none;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0.02em;
 }
 
@@ -120,7 +121,7 @@ main { flex: 1; }
 .slice-copy h2 {
   color: var(--slice-title);
   font-size: 1.9rem;
-  font-weight: 650;
+  font-weight: 600;
   margin-bottom: 0.4rem;
 }
 
@@ -306,7 +307,7 @@ body.has-selection.is-selling-open .shop-panel {
   gap: 1rem;
 }
 
-.shop-name { font-weight: 650; font-size: 0.76rem; letter-spacing: 0.01em; }
+.shop-name { font-weight: 600; font-size: 0.76rem; letter-spacing: 0.01em; }
 
 .shop-line-price { font-size: 0.72rem; opacity: 0.88; }
 
@@ -393,7 +394,7 @@ body.has-selection.is-selling-open .shop-panel {
   border-top: 2px solid rgba(255, 255, 255, 0.7);
 }
 
-.shop-total { font-size: 0.88rem; font-weight: 650; }
+.shop-total { font-size: 0.88rem; font-weight: 600; }
 
 .shop-checkout {
   border: none;
@@ -443,10 +444,11 @@ body.has-selection.is-selling-open .shop-panel {
   position: fixed;
   z-index: 90;
   width: min(380px, calc(100vw - 2rem));
-  padding: 0.85rem 1rem;
+  padding: 1.4rem 1.5rem;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
+  gap: 0.5rem;
   overflow-y: auto;
   background: #ffffff;
   color: var(--card-dark, var(--site-ink, #1a1a1a));
@@ -486,40 +488,42 @@ body.has-selection.is-selling-open .shop-panel {
 
 /* The covered half remains blank so the earring can sit over the card. */
 .earring-hover-card[data-side="right"] {
-  padding-left: max(0.7rem, var(--earring-clearance));
+  padding-left: max(1.5rem, var(--earring-clearance));
 }
 
 .earring-hover-card[data-side="left"] {
-  padding-right: max(0.7rem, var(--earring-clearance));
+  padding-right: max(1.5rem, var(--earring-clearance));
 }
 
+/* One text size throughout the card, matching the shop panel on the right;
+   weight alone carries the hierarchy (title/price heaviest, materials/
+   description lighter). */
 .earring-hover-card h3 {
-  margin: 0 0 0.25rem;
-  font-size: 0.9rem;
-  line-height: 1.2;
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
 }
 
 .earring-hover-materials,
 .earring-hover-description,
-.earring-hover-price { margin: 0; }
+.earring-hover-price { margin: 0; font-size: 0.76rem; }
 
 .earring-hover-materials {
   color: var(--card-mid, var(--site-accent));
-  font-size: 0.64rem;
+  font-weight: 400;
   line-height: 1.3;
   opacity: 1;
 }
 
 .earring-hover-description {
-  margin-top: 0.4rem;
-  font-size: 0.76rem;
+  font-weight: 400;
   line-height: 1.4;
 }
 
 .earring-hover-price {
-  margin-top: 0.45rem;
-  font-size: 0.8rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .shop-status {
@@ -559,7 +563,7 @@ body.has-selection.is-selling-open .shop-panel {
 
 .studio-card h2 { font-size: 1.1rem; }
 .studio-detail, .studio-held { font-size: 0.78rem; line-height: 1.4; opacity: 0.75; }
-.studio-card label { display: grid; gap: 0.35rem; font-size: 0.78rem; font-weight: 650; }
+.studio-card label { display: grid; gap: 0.35rem; font-size: 0.78rem; font-weight: 600; }
 .studio-card input[type="number"], .studio-card select {
   width: 100%;
   padding: 0.6rem 0.7rem;
@@ -592,7 +596,7 @@ body.has-selection.is-selling-open .shop-panel {
   gap: 0.7rem;
 }
 
-.earring-price { font-weight: 650; font-size: 1.15rem; }
+.earring-price { font-weight: 600; font-size: 1.15rem; }
 
 .earring-stock { font-size: 0.9rem; opacity: 0.75; }
 

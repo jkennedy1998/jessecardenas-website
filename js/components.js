@@ -158,28 +158,38 @@ function buildEarringHoverCard(stage) {
   let activeState = null;
   const place = (state) => {
     const boardRect = state.hang.getBoundingClientRect();
-    // Do not use the canvas bounding box here: its box expands and contracts
-    // while CSS rotates the image. The fixed frame geometry keeps card text
-    // stable while a sequence changes or the earring swings.
-    const scale = state.renderedScale;
-    const imageWidth = state.canvas.width * scale;
-    const center = boardRect.left + state.x * boardRect.width;
-    const centerY = boardRect.top + state.y * boardRect.height + state.fh * scale / 2;
+    // Anchor off the earring's resting home node and its base (un-hovered)
+    // scale — never live x/y, dial angle, or the hover scale-up — so the
+    // card holds still while the earring spins, jiggles, or grows under the
+    // pointer. It only moves again when the hover target changes or the
+    // earring is actually dropped on a new node.
+    const home = state.home;
+    const scale = state.baseScale;
+    const earringWidth = state.fw * scale;
+    const earringHeight = state.fh * scale;
+    const center = boardRect.left + home.x * boardRect.width;
+    const centerY = boardRect.top + home.y * boardRect.height + earringHeight / 2;
     const cardWidth = card.offsetWidth;
-    const cardHeight = card.offsetHeight;
+    // The card runs roughly as long as the earring itself.
+    card.style.height = `${earringHeight}px`;
+    const cardHeight = earringHeight;
     // The board, not the browser viewport, determines the card side. This
     // keeps cards for right-half earrings inside the grate side, away from
     // the selling panel in horizontal layouts.
-    const wantsRight = state.x < 0.5;
-    // The card begins at the image center, behind the earring. Its inner
-    // padding reserves the covered half for the earring rather than text.
-    const left = wantsRight ? center : center - cardWidth;
+    const wantsRight = home.x < 0.5;
+    // The card's near edge reaches a little past the earring's far edge so
+    // the card almost completely engulfs it (their matching stroke/card
+    // color is what makes that read as one shape, not two overlapping ones).
+    const overlap = 16;
+    const left = wantsRight
+      ? center - earringWidth / 2 - overlap
+      : center + earringWidth / 2 + overlap - cardWidth;
     card.dataset.side = wantsRight ? "right" : "left";
-    card.style.setProperty("--earring-clearance", `${imageWidth / 2 + 10}px`);
+    card.style.setProperty("--earring-clearance", `${earringWidth + overlap}px`);
     card.style.left = `${Math.max(12, Math.min(left, window.innerWidth - cardWidth - 12))}px`;
     const top = centerY - cardHeight / 2;
     card.style.top = `${Math.max(12, Math.min(top, window.innerHeight - cardHeight - 12))}px`;
-    card.style.setProperty("--card-slide-x", `${wantsRight ? -imageWidth / 2 : imageWidth / 2}px`);
+    card.style.setProperty("--card-slide-x", `${wantsRight ? -earringWidth / 2 : earringWidth / 2}px`);
   };
 
   window.addEventListener("resize", () => {
@@ -189,7 +199,12 @@ function buildEarringHoverCard(stage) {
   return {
     show(entry, state) {
       const changedEarring = activeState !== state;
+      // Reposition once when the drag that just ended actually relocated the
+      // earring to a new node — never mid-drag, so rotating/moving it never
+      // reframes the card.
+      const justReleased = !changedEarring && state.wasDragging && !state.dragging;
       activeState = state;
+      state.wasDragging = state.dragging;
       if (changedEarring) {
         title.textContent = entry.title || entry.slug;
         materials.textContent = entry.materials || "";
@@ -204,10 +219,7 @@ function buildEarringHoverCard(stage) {
       card.style.setProperty("--card-mid", cardPalette.mid);
       card.style.setProperty("--card-light", cardPalette.light);
       card.classList.toggle("is-selected", window.Shop.has(entry.slug));
-      // The animation updates hover state every frame. Reposition only on a
-      // new hover (or while physically dragging) so text never jitters as
-      // the earring turns through its image sequence.
-      if (changedEarring || state.dragging) place(state);
+      if (changedEarring || justReleased) place(state);
       card.classList.add("is-active");
     },
     hide() {
