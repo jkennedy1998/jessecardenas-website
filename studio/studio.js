@@ -28,8 +28,18 @@ window.Studio = (() => {
     detail.className = 'studio-detail';
     detail.textContent = `${listing.active ? 'active in Stripe' : 'inactive in Stripe'} · ${listing.currency.toUpperCase()} $${listing.price}`;
 
+    const thumb = document.createElement('img');
+    thumb.className = 'studio-thumb';
+    if (listing.image) {
+      thumb.src = listing.image;
+      thumb.alt = listing.title;
+      thumb.loading = 'lazy';
+    } else {
+      thumb.hidden = true;
+    }
+
     const stockLabel = document.createElement('label');
-    stockLabel.textContent = 'available individual earrings';
+    stockLabel.textContent = 'total individual earrings (holds come out after payment)';
     const stock = document.createElement('input');
     stock.type = 'number';
     stock.min = '0';
@@ -55,7 +65,13 @@ window.Studio = (() => {
 
     const held = document.createElement('p');
     held.className = 'studio-held';
-    held.textContent = listing.reserved ? `${listing.reserved} currently held in checkout` : '';
+    const heldText = (data) => {
+      const bits = [];
+      if (data.reserved) bits.push(`${data.reserved} currently held in checkout`);
+      bits.push(`${data.available ?? data.quantity} available now`);
+      return bits.join(' · ');
+    };
+    held.textContent = heldText(listing);
 
     const save = document.createElement('button');
     save.type = 'button';
@@ -76,6 +92,9 @@ window.Studio = (() => {
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.error || 'Could not save this listing.');
         setStatus(`${listing.title} saved.`);
+        // Re-pull canonical state so the form shows what the Worker stored
+        // (holds, availability) instead of trusting the typed values.
+        void load();
       } catch (cause) {
         setStatus(cause.message || 'Could not save this listing.', true);
       } finally {
@@ -83,7 +102,7 @@ window.Studio = (() => {
       }
     });
 
-    card.append(heading, detail, stockLabel, graphicLabel, publishLabel, held, save);
+    card.append(heading, thumb, detail, stockLabel, graphicLabel, publishLabel, held, save);
     return card;
   }
 

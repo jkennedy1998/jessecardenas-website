@@ -7,9 +7,11 @@ window.SHOP_CONFIG = {
 };
 
 window.Shop = (() => {
-  // visual slug -> { productId, slug, title, unitPrice, mode, quantity, maxSingles }
-  // mode: "single" | "pair"; quantity counts units of that mode; a pair
-  // consumes 2 singles of stock. unitPrice is per single.
+  // productId -> { productId, slug, title, unitPrice, mode, quantity, maxSingles }
+  // The cart is keyed by Stripe productId, never by the visual slug: two
+  // products can share one graphic, and slug keying made them highlight and
+  // edit as one item. mode: "single" | "pair"; quantity counts units of that
+  // mode; a pair consumes 2 singles of stock. unitPrice is per single.
   const items = new Map();
 
   const maxFor = (item) => item.mode === "pair"
@@ -20,10 +22,10 @@ window.Shop = (() => {
     item.unitPrice * item.quantity * (item.mode === "pair" ? 2 : 1);
 
   function toggle(entry, mode = "single") {
-    if (items.has(entry.slug)) {
-      items.delete(entry.slug);
+    if (items.has(entry.productId)) {
+      items.delete(entry.productId);
     } else {
-      items.set(entry.slug, {
+      items.set(entry.productId, {
         productId: entry.productId,
         slug: entry.slug,
         title: entry.title || entry.slug,
@@ -36,18 +38,18 @@ window.Shop = (() => {
     render();
   }
 
-  function remove(slug) {
-    items.delete(slug);
+  function remove(productId) {
+    items.delete(productId);
     render();
   }
 
-  function has(slug, mode) {
-    if (!items.has(slug)) return false;
-    return !mode || items.get(slug).mode === mode;
+  function has(productId, mode) {
+    if (!items.has(productId)) return false;
+    return !mode || items.get(productId).mode === mode;
   }
 
-  function setMode(slug, mode) {
-    const item = items.get(slug);
+  function setMode(productId, mode) {
+    const item = items.get(productId);
     if (!item) return;
     item.mode = mode;
     // `|| 1` here would silently force quantity back up to 1 even when this
@@ -59,8 +61,8 @@ window.Shop = (() => {
     render();
   }
 
-  function setQuantity(slug, quantity) {
-    const item = items.get(slug);
+  function setQuantity(productId, quantity) {
+    const item = items.get(productId);
     if (!item) return;
     item.quantity = Math.max(1, Math.min(Math.round(quantity), maxFor(item)));
     render();

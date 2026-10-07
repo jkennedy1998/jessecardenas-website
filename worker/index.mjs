@@ -76,6 +76,7 @@ function productDetails(product) {
     currency: price.currency,
     priceId: price.id,
     active: product.active,
+    image: product.images?.[0] || '',
   };
 }
 
@@ -131,30 +132,50 @@ export class InventoryLock {
   listingKey(productId) { return `listing:${productId}`; }
   reservationKey(id) { return `reservation:${id}`; }
 
-  async releaseExpiredReservations() {
-    const reservations = await this.state.storage.list({ prefix: 'reservation:' });
+  // Expired pending holds flip to released without touching listing stock —
+  // quantity was never decremented at reserve time, so there is nothing to
+  // give back. Safe to run anywhere; flipping is idempotent.
+  async expireReservationsInTxn(txn) {
+    const reservations = await txn.list({ prefix: 'reservation:' });
     for (const reservation of reservations.values()) {
       if (reservation.status === 'pending' && reservation.expiresAt <= nowSeconds()) {
-        await this.releaseReservation(reservation.id);
+        await txn.put(this.reservationKey(reservation.id), { ...reservation, status: 'released' });
       }
     }
+  }
+
+  async releaseExpiredReservations() {
+    await this.state.storage.transaction(async (txn) => this.expireReservationsInTxn(txn));
+  }
+
+  // Count live holds per product from pending reservations. Expired holds
+  // must be flipped first (inside the same transaction) or they would still
+  // consume availability here.
+  async pendingReservedInTxn(txn) {
+    const reservations = await txn.list({ prefix: 'reservation:' });
+    const reservedByProduct = new Map();
+    for (const reservation of reservations.values()) {
+      if (reservation.status !== 'pending') continue;
+      for (const item of reservation.items) {
+        reservedByProduct.set(item.productId, (reservedByProduct.get(item.productId) || 0) + item.singles);
+      }
+    }
+    return reservedByProduct;
   }
 
   async releaseReservation(id) {
     await this.state.storage.transaction(async (txn) => {
       const reservation = await txn.get(this.reservationKey(id));
-      if (!reservation || reservation.status !== 'pending') return;
-      for (const item of reservation.items) {
-        const listing = await txn.get(this.listingKey(item.productId));
-        if (listing) await txn.put(this.listingKey(item.productId), {
-          ...listing,
-          quantity: listing.quantity + item.singles,
-        });
+      if (reservation?.status === 'pending') {
+        await txn.put(this.reservationKey(id), { ...reservation, status: 'released' });
       }
-      await txn.put(this.reservationKey(id), { ...reservation, status: 'released' });
     });
   }
 
+  // A hold never decrements stored stock — it only consumes availability
+  // (stock minus pending holds) until it expires, is released, or is paid.
+  // Stored stock drops exactly once, in markReservationPaid, after Stripe
+  // confirms the purchase.
   async reserve(items) {
     const reservation = {
       id: crypto.randomUUID(),
@@ -164,20 +185,14 @@ export class InventoryLock {
       sessionId: null,
     };
     await this.state.storage.transaction(async (txn) => {
-      const listings = await Promise.all(items.map((item) => txn.get(this.listingKey(item.productId))));
-      for (let index = 0; index < items.length; index += 1) {
-        const listing = listings[index];
-        const item = items[index];
-        if (!listing?.published || listing.quantity < item.singles) {
+      await this.expireReservationsInTxn(txn);
+      const reservedByProduct = await this.pendingReservedInTxn(txn);
+      for (const item of items) {
+        const listing = await txn.get(this.listingKey(item.productId));
+        const reserved = reservedByProduct.get(item.productId) || 0;
+        if (!listing?.published || listing.quantity - reserved < item.singles) {
           throw new HttpError(409, 'A selected earring is no longer available.');
         }
-      }
-      for (let index = 0; index < items.length; index += 1) {
-        const listing = listings[index];
-        await txn.put(this.listingKey(items[index].productId), {
-          ...listing,
-          quantity: listing.quantity - items[index].singles,
-        });
       }
       await txn.put(this.reservationKey(reservation.id), reservation);
     });
@@ -193,12 +208,20 @@ export class InventoryLock {
     });
   }
 
+  // The single point where stored stock actually drops: Stripe has confirmed
+  // the money, so the reservation's units leave inventory permanently.
   async markReservationPaid(id) {
     await this.state.storage.transaction(async (txn) => {
       const reservation = await txn.get(this.reservationKey(id));
-      if (reservation?.status === 'pending') {
-        await txn.put(this.reservationKey(id), { ...reservation, status: 'paid' });
+      if (reservation?.status !== 'pending') return;
+      for (const item of reservation.items) {
+        const listing = await txn.get(this.listingKey(item.productId));
+        if (listing) await txn.put(this.listingKey(item.productId), {
+          ...listing,
+          quantity: Math.max(0, listing.quantity - item.singles),
+        });
       }
+      await txn.put(this.reservationKey(id), { ...reservation, status: 'paid' });
     });
   }
 
@@ -211,12 +234,17 @@ export class InventoryLock {
   async catalog() {
     await this.releaseExpiredReservations();
     const products = await this.stripeProducts(true);
+    const reservedByProduct = await this.pendingReservedInTxn(this.state.storage);
     const listings = [];
     for (const product of products) {
       const details = productDetails(product);
       const listing = await this.state.storage.get(this.listingKey(product.id));
-      if (!details || !listing?.published || listing.quantity < 1) continue;
-      listings.push({ ...details, quantity: listing.quantity, graphicKey: listing.graphicKey });
+      if (!details || !listing?.published) continue;
+      // Customers see stock minus live holds, so an in-flight checkout makes
+      // the unit unavailable without it having been sold yet.
+      const available = listing.quantity - (reservedByProduct.get(product.id) || 0);
+      if (available < 1) continue;
+      listings.push({ ...details, quantity: available, graphicKey: listing.graphicKey });
     }
     return json({ listings }, 200, { 'cache-control': 'no-store' });
   }
@@ -243,6 +271,7 @@ export class InventoryLock {
         ...details,
         quantity: listing?.quantity || 0,
         reserved: reservedByProduct.get(product.id) || 0,
+        available: Math.max(0, (listing?.quantity || 0) - (reservedByProduct.get(product.id) || 0)),
         published: listing?.published || false,
         graphicKey: listing?.graphicKey || '',
       });
@@ -258,8 +287,11 @@ export class InventoryLock {
     if (!Number.isSafeInteger(quantity) || quantity < 0 || typeof published !== 'boolean' || !graphicKey) {
       throw new HttpError(400, 'Stock, graphic, and publish status are required.');
     }
-    const product = await stripeGet(this.env, `/v1/products/${encodeURIComponent(productId)}?expand[]=default_price`);
-    if (!productDetails(product)) throw new HttpError(400, 'This Stripe Product needs an active default Price.');
+    // No Stripe round-trip here on purpose: a save must be a deterministic
+    // local write. A transient Stripe failure used to fail the whole save,
+    // which read as "the studio update is finicky". Listings only surface
+    // through studioListings for Products Stripe actually returns, so a
+    // phantom productId is inert.
     const listing = { productId, quantity, published, graphicKey };
     await this.state.storage.put(this.listingKey(productId), listing);
     return json({ listing });

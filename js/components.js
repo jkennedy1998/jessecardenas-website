@@ -483,7 +483,7 @@ function buildShopPanel(panel) {
       const removeButton = el("button", "shop-remove", "×");
       removeButton.type = "button";
       removeButton.setAttribute("aria-label", `remove ${item.title}`);
-      removeButton.addEventListener("click", () => window.Shop.remove(item.slug));
+      removeButton.addEventListener("click", () => window.Shop.remove(item.productId));
       controls.append(mode, stepper, stock, removeButton);
       row.append(head, controls);
       list.append(row);

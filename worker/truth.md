@@ -18,6 +18,11 @@
 - j-quote: "then when there is no more quantity per an earing it will not be shown. when only one left is availible the user should only be able to buy 1."
 - interpretation: quantity is individual-earring stock; zero hides a listing and checkout rejects quantities beyond available stock.
 
+### 2026-10-07-stock-drop-after-purchase
+- j-quote: "stock went down after i got the the stripe link > not after i made the purchase. this shiouyld happen after purchase not after the purchase button is pressed."
+- j-quote: "the stock needds to be pretty watertight."
+- interpretation: checkout-button press only holds units (availability); stored stock decrements exactly once, on the paid Stripe webhook.
+
 ### 2026-10-06-studio-admin
 - j-quote: "Jeshcaprints@gmail.com for jesses email"
 - interpretation: Catalog Studio access must be limited to `Jeshcaprints@gmail.com`.

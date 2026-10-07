@@ -10,7 +10,8 @@ metadata only holds `Material`; it is not used for inventory.
 password (HTTP Basic Auth) known only to Jesse and the operator — no account
 or login flow. Each Stripe Product can be given:
 
-- **available individual earrings** — current sellable stock
+- **total individual earrings** — true stock; units currently held in checkout
+  stay counted here until payment lands
 - **approved graphic** — a key from `source/earrings/graphics.json`
 - **publish** — only published records with stock appear in the shop
 
@@ -20,9 +21,11 @@ Product name, description, or default Price cannot detach its prepared art.
 ## checkout lifecycle
 
 The Worker atomically reserves the requested individual units before it creates
-a 30-minute Stripe Checkout Session. A successful payment keeps that reduction;
-an expired or failed session releases it. Webhook event IDs are deduped, and the
-Worker verifies Stripe's signature before changing stock.
+a 30-minute Stripe Checkout Session. A hold reduces *availability* (stock minus
+pending holds) but never the stored stock value. Only Stripe's signed
+`checkout.session.completed` (paid) webhook permanently decrements stock;
+an expired or failed session simply drops its hold. Webhook event IDs are
+deduped, and the Worker verifies Stripe's signature before changing stock.
 
 ## deploy
 

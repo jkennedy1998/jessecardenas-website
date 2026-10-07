@@ -572,6 +572,8 @@ body.has-selection.is-selling-open .shop-panel {
 }
 
 .studio-card h2 { font-size: 1.1rem; }
+.studio-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 0.75rem; }
+.studio-thumb[hidden] { display: none; }
 .studio-detail, .studio-held { font-size: 0.78rem; line-height: 1.4; opacity: 0.75; }
 .studio-card label { display: grid; gap: 0.35rem; font-size: 0.78rem; font-weight: 600; }
 .studio-card input[type="number"], .studio-card select {
