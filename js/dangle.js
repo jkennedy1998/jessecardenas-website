@@ -827,7 +827,12 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
 
   let last = performance.now();
   function tick(now) {
-    const dt = Math.min((now - last) / 1000, 1 / 30);
+    // Floor the frame dt: two rAF ticks can share a timestamp (hardened
+    // browser builds coarsen timers), and dt = 0 poisons the physics chain
+    // with NaN — vx = 0/0 = NaN, then 0 * NaN spreads it into the dial,
+    // corners, and frame index of EVERY earring in the same frame. They all
+    // go blank silently: NaN never throws and no GL context is lost.
+    const dt = Math.min(Math.max((now - last) / 1000, 1 / 1000), 1 / 30);
     last = now;
     for (const item of items) {
       try {
@@ -844,6 +849,25 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
+
+  // Light watchdog: every ~2s, scrub NaN physics per earring and log only
+  // when something was actually wrong — silent blank canvases must leave a
+  // trace without spamming the console on healthy frames.
+  setInterval(() => {
+    for (const { state } of items) {
+      const bad = !Number.isFinite(state.angle) || !Number.isFinite(state.frameF)
+        || state.corners.some((c) => !Number.isFinite(c.x) || !Number.isFinite(c.y));
+      if (!bad) continue;
+      console.warn("[dangle] NaN physics detected — scrubbing the earring back to rest");
+      state.angle = 0; state.dialVel = 0; state.prevDialVel = 0;
+      state.swing = 0; state.swingVel = 0;
+      state.frameF = 0;
+      for (const c of state.corners) { c.x = 0; c.y = 0; c.vx = 0; c.vy = 0; }
+      state.prevX = state.x; state.prevVx = 0;
+      state.prevY = state.y; state.prevVy = 0;
+      state.pointerVelocityX = 0; state.lastPointerAx = 0;
+    }
+  }, 2000);
 
   window.addEventListener("resize", () => {
     for (const { state } of items) {

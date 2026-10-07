@@ -152,6 +152,15 @@ window.JellyGL = (() => {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      // A failed upload (GPU out of memory under pressure) never throws —
+      // every later draw just renders nothing, a silent permanent blank.
+      // Detect it and hand the earring to the 2d fallback instead.
+      const uploadError = gl.getError();
+      if (uploadError !== gl.NO_ERROR) {
+        console.warn(`[dangle] webgl texture upload failed (0x${uploadError.toString(16)}) — falling back to 2d`);
+        draw.failed = true;
+        return;
+      }
       uploaded = true;
     }
 
