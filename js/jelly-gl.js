@@ -205,6 +205,10 @@ window.JellyGL = (() => {
         draw.failed = true;
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
+        if (!draw.failLogged) {
+          draw.failLogged = true;
+          console.warn("[dangle] webgl draw threw — falling back to 2d:", err);
+        }
       }
     };
     draw.failed = false;
@@ -218,6 +222,7 @@ window.JellyGL = (() => {
     canvas.addEventListener("webglcontextlost", (event) => {
       event.preventDefault();
       draw.failed = true;
+      console.warn("[dangle] webgl context lost — falling back to 2d");
     });
     return draw;
   }

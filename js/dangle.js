@@ -303,7 +303,22 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     }
 
     const sheet = new Image();
-    sheet.src = new URL(frames.sheet, document.location.href).href;
+    // A failed sheet load must not leave the earring blank forever: every
+    // draw path early-returns on a missing image with no console signal.
+    // Retry a few times (cache-busted) and log each attempt so a transient
+    // network/CDN hiccup during spawn is visible and self-heals.
+    const sheetUrl = new URL(frames.sheet, document.location.href).href;
+    let sheetRetries = 0;
+    sheet.addEventListener("error", () => {
+      console.error(`[dangle] earring sheet failed to load (attempt ${sheetRetries + 1}):`, sheetUrl);
+      if (sheetRetries < 3) {
+        sheetRetries += 1;
+        setTimeout(() => {
+          sheet.src = `${sheetUrl}${sheetUrl.includes("?") ? "&" : "?"}retry=${sheetRetries}`;
+        }, 1000 * sheetRetries);
+      }
+    });
+    sheet.src = sheetUrl;
 
     Object.assign(state, {
       canvas, hitArea, ctx: null, sheet,
@@ -343,8 +358,27 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     state.draw = window.JellyGL
       ? window.JellyGL.create(canvas, frames)
       : null;
-    if (state.draw) state.ctx = null;
-    else state.ctx = canvas.getContext("2d");
+    if (state.draw) {
+      state.ctx = null;
+    } else {
+      state.ctx = canvas.getContext("2d");
+      if (!state.ctx) {
+        // The webgl path failed after the canvas already held a webgl
+        // context (e.g. shader/link failure), so getContext("2d") returns
+        // null on it — that used to blank the earring forever, silently.
+        // Swap in a clean canvas and continue on the 2d path.
+        console.warn("[dangle] webgl unavailable at spawn — swapping to a clean 2d canvas");
+        const two = document.createElement("canvas");
+        two.className = canvas.className;
+        two.width = canvas.width;
+        two.height = canvas.height;
+        two.style.left = canvas.style.left;
+        two.style.top = canvas.style.top;
+        canvas.replaceWith(two);
+        state.canvas = two;
+        state.ctx = two.getContext("2d");
+      }
+    }
 
     // Hover raises this earring and activates the one board-level info card.
     hitArea.addEventListener("pointerenter", (event) => {
@@ -576,6 +610,10 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       if (state.draw && state.draw.failed && !state.ctx) {
         // WebGL tainted the canvas (file:// pages) — a 2D context can't be
         // created on it, so swap in a clean canvas and continue on the 2D path.
+        if (!state.swapLogged) {
+          state.swapLogged = true;
+          console.warn("[dangle] webgl renderer failed — swapped to 2d fallback");
+        }
         const two = document.createElement("canvas");
         two.className = state.canvas.className;
         two.width = state.canvas.width;
@@ -585,6 +623,10 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         state.canvas.replaceWith(two);
         state.canvas = two;
         state.ctx = two.getContext("2d");
+        if (!state.ctx) {
+          // Without this the swap re-ran every frame, blank, with no signal.
+          console.error("[dangle] 2d fallback context unavailable — earring stays blank");
+        }
       }
       drawJelly2D(state);
     } catch (err) {
