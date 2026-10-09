@@ -171,6 +171,57 @@ main { flex: 1; }
   pointer-events: none;
 }
 
+/* board carousel: dots above the grate, one per saved layout plus the auto
+   selection board last; the board slides out/in on board switches. */
+.board-dots {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.board-dot {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--active-mid, #7a6f66) 45%, transparent);
+  cursor: pointer;
+  transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.board-dot:hover { transform: scale(1.35); }
+
+.board-dot.is-active {
+  background: var(--active-dark, #333);
+  transform: scale(1.2);
+}
+
+.board-dot.is-selection.is-active {
+  background: var(--active-mid, #7a6f66);
+}
+
+.earring-board {
+  transition: transform 0.42s cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+.earring-board.is-leaving-left,
+.earring-board.is-entering-right { transform: translateX(-85%); }
+
+.earring-board.is-leaving-right,
+.earring-board.is-entering-left { transform: translateX(85%); }
+
+/* entry legs jump instantly to their off-stage start point; leaving the
+   class then eases the board back to rest */
+.earring-board.is-entering-left,
+.earring-board.is-entering-right { transition: none; }
+
+.earring-board.is-leaving-left,
+.earring-board.is-leaving-right {
+  transition: transform 0.42s cubic-bezier(0.45, 0, 0.55, 1);
+}
+
 .earring-dangle {
   position: absolute;
   left: 0;
@@ -560,6 +611,156 @@ body.has-selection.is-selling-open .shop-panel {
 .studio-header p { max-width: 42rem; margin-top: 1rem; line-height: 1.5; }
 .studio-status { min-height: 1.5rem; margin-bottom: 1rem; font-size: 0.85rem; }
 .studio-status[data-error="true"] { color: #a03030; }
+
+/* board layout authoring (studio/layouts.js): dots + grate replica + picker */
+.layout-editor {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  display: grid;
+  gap: 1rem;
+}
+
+/* the grid display above would defeat the [hidden] boot state */
+.layout-editor[hidden] { display: none; }
+
+.layout-editor h2 { font-size: 1.2rem; margin: 0; }
+.layout-intro { font-size: 0.85rem; margin: 0; max-width: 46rem; }
+
+.layout-dots { display: flex; align-items: flex-end; gap: 14px; }
+
+.layout-dot-slot {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.layout-dot-delete {
+  border: none;
+  background: none;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+  padding: 2px 4px;
+}
+
+.layout-dot-delete:hover { opacity: 1; color: #a03030; }
+
+.layout-dot-plus {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, currentColor 45%, transparent);
+  background: none;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  align-self: center;
+}
+
+.layout-dot-plus:hover { border-style: solid; }
+
+.layout-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 460px) minmax(220px, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .layout-stage { grid-template-columns: 1fr; }
+}
+
+.layout-board {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1068 / 1084;
+  background: url("../assets/grate.png") no-repeat center / 100% 100%;
+  border-radius: 0.5rem;
+  touch-action: none;
+}
+
+.layout-placed {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 25%);
+  touch-action: none;
+}
+
+.layout-placed.is-dragging {
+  cursor: grabbing;
+  z-index: 2;
+  box-shadow: 0 6px 14px rgb(0 0 0 / 35%);
+}
+
+.layout-placed[data-off-board="true"] { opacity: 0.35; }
+
+.layout-side { display: grid; gap: 0.9rem; align-content: start; }
+
+.layout-side label { display: grid; gap: 0.35rem; font-size: 0.78rem; font-weight: 600; }
+
+.layout-name, .layout-picker-button, .layout-save {
+  font: inherit;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  background: none;
+}
+
+.layout-picker { position: relative; }
+
+.layout-picker-button { cursor: pointer; text-align: left; }
+
+.layout-picker-panel {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 240px;
+  max-height: 300px;
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  background: canvas;
+  box-shadow: 0 8px 20px rgb(0 0 0 / 18%);
+}
+
+.layout-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  border-radius: 0.4rem;
+  background: none;
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.layout-picker-row:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+
+.layout-picker-row img {
+  width: 34px;
+  height: 34px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.layout-picker-empty { font-size: 0.8rem; margin: 0.3rem; }
+
+.layout-status { min-height: 1.25rem; margin: 0; font-size: 0.85rem; }
+.layout-status[data-error="true"] { color: #a03030; }
 .studio-list { display: grid; gap: 1rem; }
 
 .studio-card {

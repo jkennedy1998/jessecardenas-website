@@ -18,8 +18,29 @@
     </header>
     <p class="studio-status" role="status">loading listings…</p>
     <section class="studio-list" aria-label="Stripe product listings"></section>
+    <section class="layout-editor" aria-label="board layouts" hidden>
+      <h2>board layouts</h2>
+      <p class="layout-intro">each board is one full display on the shop page. drag earrings onto the grate; drag one off to remove it. availability follows the listings above.</p>
+      <div class="layout-dots" aria-label="layout boards"></div>
+      <div class="layout-stage">
+        <div class="layout-board"></div>
+        <div class="layout-side">
+          <label class="layout-name-label">board name
+            <input type="text" class="layout-name" maxlength="120" placeholder="front wall">
+          </label>
+          <div class="layout-picker">
+            <button type="button" class="layout-picker-button">+ add earring</button>
+            <div class="layout-picker-panel" hidden></div>
+          </div>
+          <button type="button" class="layout-save">save board</button>
+        </div>
+      </div>
+      <p class="layout-status" role="status"></p>
+    </section>
   </main>
   <script src="../source/earrings/entries.js"></script>
+  <script src="../js/dangle.js"></script>
   <script src="studio.js"></script>
+  <script src="layouts.js"></script>
 </body>
 </html>
