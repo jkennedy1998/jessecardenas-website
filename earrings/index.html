@@ -11,10 +11,14 @@
 </head>
 <body>
   <main class="earring-stage">
-    <div class="earring-board"></div>
+    <div class="board-pane">
+      <div class="board-dots" hidden></div>
+      <div class="earring-board"></div>
+    </div>
     <aside class="shop-panel"></aside>
   </main>
   <script src="../source/earrings/entries.js"></script>
+  <script>window.addEventListener('error', (e) => { document.title = 'ERR: ' + e.message; });</script>
   <script src="../js/shop.js"></script>
   <script src="../js/jelly-gl.js"></script>
   <script src="../js/dangle.js"></script>

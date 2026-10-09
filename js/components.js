@@ -83,7 +83,7 @@ function applyActivePalette(palette) {
 // indexed family. RGB averaging made blue + yellow look yellow; hue blending
 // makes their shared family green while preserving one cohesive UI palette.
 function setActiveColor(entries) {
-  const selected = entries.filter((entry) => window.Shop.has(entry.slug));
+  const selected = entries.filter((entry) => window.Shop.has(entry.productId));
   const paletteEntries = Object.entries(window.EARRING_COLOR_PALETTE || {});
   if (!selected.length) {
     // Keep the last family alive while the selling card fades away. Its
@@ -218,7 +218,7 @@ function buildEarringHoverCard(stage) {
       card.style.setProperty("--card-dark", cardPalette.dark);
       card.style.setProperty("--card-mid", cardPalette.mid);
       card.style.setProperty("--card-light", cardPalette.light);
-      card.classList.toggle("is-selected", window.Shop.has(entry.slug));
+      card.classList.toggle("is-selected", window.Shop.has(entry.productId));
       if (changedEarring || justReleased) place(state);
       card.classList.add("is-active");
     },
@@ -365,7 +365,7 @@ function buildEarringSlice(entry, index) {
     buttons.forEach((button) => {
       const mode = button.dataset.mode;
       const needed = mode === "pair" ? 2 : 1;
-      const selected = window.Shop.has(entry.slug, mode);
+      const selected = window.Shop.has(entry.productId, mode);
       button.disabled = quantity < needed && !selected;
       button.dataset.selected = selected ? "true" : "false";
     });
@@ -520,10 +520,42 @@ function showShopStatus(stage, text) {
   stage?.append(status);
 }
 
+// Board layouts: the saved display layouts are the full truth for what the
+// board shows (J's call). /api/layouts is public; an empty/missing list keeps
+// the pre-layouts behavior so the live site never blanks before Jesse saves
+// a first layout in Studio.
+async function currentLayouts() {
+  try {
+    const response = await fetch("/api/layouts", { cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && Array.isArray(data.layouts) && data.layouts.length) return data.layouts;
+  } catch {}
+  return [{ id: "default", name: "", order: 0, items: null }];
+}
+
+const SELECTION_LAYOUT_ID = "__selection";
+
+// First-free node resolution for entries without a saved node (legacy map)
+// or with conflicts; used per mounting, never persisted.
+function resolveNodes(list) {
+  const used = new Set();
+  let auto = 0;
+  return list.map((entry) => {
+    let node = entry.node;
+    if (!node || used.has(node)) {
+      do { auto += 1; } while (used.has(auto));
+      node = auto;
+    }
+    used.add(node);
+    return { ...entry, node };
+  });
+}
+
 async function initEarringsPage() {
   const board = document.querySelector(".earring-board");
   const container = document.querySelector(".slices");
   const stage = document.querySelector(".earring-stage");
+  const dots = document.querySelector(".board-dots");
   let entries;
   try {
     entries = await currentListings();
@@ -536,80 +568,168 @@ async function initEarringsPage() {
     else showShopStatus(stage, "no earrings listed yet — check back soon.");
     return;
   }
-  // The hover card lives inside the board's stacking context (the board is
-  // z 20 over the purchase panel): a hovered earring at z 100 must rise
-  // above the card (the engulf look) while the card stays above every
-  // unhovered earring (z 0..9) and the board-level contact shadows (z -1).
-  const hoverCard = board ? buildEarringHoverCard(board) : null;
 
-  const usedNodes = new Set(
-    entries.map((entry) => entry.node).filter((node) => Number.isInteger(node)),
-  );
-  let autoNode = 0;
-  const jellyStates = [];
-  entries.forEach((entry) => {
-    // frame-sequence entries always hang on the board; split-piece entries
-    // use the legacy hang; anything else falls back to a flat slice
-    if (entry.frames) {
-      if (!board) return;
-      // assigned node, else first free node in reading order (a node claimed
-      // by the entry itself does not count as taken)
-      const taken = (n) => entries.some((other) => other !== entry && other.node === n);
-      let nodeIndex = entry.node;
-      if (!nodeIndex || taken(nodeIndex)) {
-        do { autoNode += 1; } while (taken(autoNode));
-        nodeIndex = autoNode;
-      }
-      const dangle = buildEarringJelly(entry);
-      board.append(dangle); // must be in the DOM before Dangle.createJelly reads geometry
-      // resolve the sheet against the site root (same as all other media
-      // paths) — the page lives under /earrings/ but assets live at /source/
-      const frames = { ...entry.frames, sheet: normalizeMediaPath(entry.frames.sheet) };
-      const jellyState = window.Dangle.createJelly(dangle, {
-        node: nodeIndex, frames, scale: 0.7, length: 140,
-        accentColor: paletteFor(entry.colors?.accent).dark,
-        // board click toggles the cart item; the shop:change listener below
-        // syncs the visual back from cart truth
-        onSelect: () => window.Shop.toggle(entry),
-        onHover: (state) => {
-          if (state) hoverCard?.show(entry, state);
-          else hoverCard?.hide();
-        },
-      });
-      jellyStates.push({ entry, state: jellyState });
-      return;
+  const layouts = await currentLayouts();
+  let activeIndex = 0;
+  let activeJellies = [];
+  let hoverCard = null;
+  let switching = false;
+
+  const byProduct = () => new Map(entries.map((entry) => [entry.productId, entry]));
+
+  // One layout -> the entries it displays. Saved layouts carry productId/node
+  // pairs; unavailable earrings drop out and their slot goes empty. The
+  // selection board mirrors the cart, whatever board its earrings live on.
+  function boardEntries(layout) {
+    const catalog = byProduct();
+    if (layout.id === SELECTION_LAYOUT_ID) {
+      return window.Shop.summary().list
+        .map((item) => catalog.get(item.productId)).filter(Boolean)
+        .map((entry, index) => ({ ...entry, node: index + 1 }));
     }
-    if (!(entry.mediaTop && entry.mediaBottom)) {
-      if (container) container.append(buildEarringSlice(entry, autoNode));
-      return;
-    }
-    if (board) {
-      let nodeIndex = entry.node;
-      if (!nodeIndex || usedNodes.has(nodeIndex)) {
-        do { autoNode += 1; } while (usedNodes.has(autoNode));
-        nodeIndex = autoNode;
-        usedNodes.add(nodeIndex);
+    if (!layout.items) return entries;
+    return layout.items
+      .map((item) => {
+        const entry = catalog.get(item.productId);
+        return entry ? { ...entry, node: item.node } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function mountLayout(layout) {
+    for (const { state } of activeJellies) window.Dangle.destroy(state);
+    activeJellies = [];
+    board.replaceChildren();
+    // The hover card lives inside the board's stacking context (the board is
+    // z 20 over the purchase panel): a hovered earring at z 100 must rise
+    // above the card (the engulf look) while the card stays above every
+    // unhovered earring (z 0..9) and the board-level contact shadows (z -1).
+    hoverCard = buildEarringHoverCard(board);
+    for (const entry of resolveNodes(boardEntries(layout))) {
+      if (entry.frames) {
+        if (!board) continue;
+        const dangle = buildEarringJelly(entry);
+        board.append(dangle); // must be in the DOM before Dangle.createJelly reads geometry
+        // resolve the sheet against the site root (same as all other media
+        // paths) — the page lives under /earrings/ but assets live at /source/
+        const frames = { ...entry.frames, sheet: normalizeMediaPath(entry.frames.sheet) };
+        const jellyState = window.Dangle.createJelly(dangle, {
+          node: entry.node, frames, scale: 0.7, length: 140,
+          accentColor: paletteFor(entry.colors?.accent).dark,
+          onSelect: () => window.Shop.toggle(entry),
+          onHover: (state) => {
+            if (state) hoverCard?.show(entry, state);
+            else hoverCard?.hide();
+          },
+        });
+        activeJellies.push({ entry, state: jellyState });
+        continue;
       }
-      const dangle = buildEarringHang(entry, nodeIndex);
+      if (!(entry.mediaTop && entry.mediaBottom)) {
+        if (container) container.append(buildEarringSlice(entry));
+        continue;
+      }
+      if (!board) continue;
+      const dangle = buildEarringHang(entry, entry.node);
       board.append(dangle); // must be in the DOM before Dangle.create reads geometry
-      window.Dangle.create(dangle, { node: nodeIndex, scale: 0.35, length: 280 });
+      window.Dangle.create(dangle, { node: entry.node, scale: 0.35, length: 280 });
     }
-  });
+    syncSelection();
+  }
 
-  if (board && SHOW_GRID_NODES) renderNodeMarkers(board);
+  // The dot strip: one dot per saved layout, plus the auto selection board
+  // last, which only exists while the cart is non-empty. It is a viewing /
+  // deselecting page for the user's picks, never an authorable layout.
+  function dotLayouts() {
+    const list = [...layouts];
+    if (window.Shop.summary().list.length) {
+      list.push({ id: SELECTION_LAYOUT_ID, name: "your picks", order: Number.MAX_SAFE_INTEGER, items: null });
+    }
+    return list;
+  }
+
+  function renderDots() {
+    if (!dots) return;
+    const list = dotLayouts();
+    if (list.length < 2) {
+      dots.hidden = true;
+      dots.replaceChildren();
+      return;
+    }
+    dots.hidden = false;
+    dots.replaceChildren();
+    list.forEach((layout, index) => {
+      const dot = document.createElement("button");
+      dot.type = "button";
+      dot.className = "board-dot";
+      if (layout.id === SELECTION_LAYOUT_ID) dot.classList.add("is-selection");
+      dot.classList.toggle("is-active", index === activeIndex);
+      dot.setAttribute("aria-label", layout.name || `board ${index + 1}`);
+      dot.title = layout.name || `board ${index + 1}`;
+      dot.addEventListener("click", () => switchTo(index));
+      dots.append(dot);
+    });
+  }
+
+  // Slide the current board off (eased, ~85% of its width), swap the
+  // content while it is gone, then slide the next board in from the far
+  // side. Direction follows the dot the user moved to.
+  function switchTo(index) {
+    const list = dotLayouts();
+    if (switching || index === activeIndex || !list[index]) return;
+    switching = true;
+    const forward = index > activeIndex;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(guard);
+      board.removeEventListener("transitionend", settle);
+      activeIndex = index;
+      board.classList.remove("is-leaving-left", "is-leaving-right");
+      board.classList.add(forward ? "is-entering-right" : "is-entering-left");
+      mountLayout(list[index]);
+      renderDots();
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        board.classList.remove("is-entering-right", "is-entering-left");
+        // one slide is 0.42s; clear the switch lock after it settles
+        setTimeout(() => { switching = false; }, 450);
+      }));
+    };
+    const guard = setTimeout(settle, 500);
+    board.addEventListener("transitionend", settle);
+  }
+
+  function syncSelection() {
+    setActiveColor(entries);
+    for (const { entry, state } of activeJellies) {
+      state.setSelected(window.Shop.has(entry.productId));
+    }
+  }
+
+  mountLayout(layouts[0]);
+  renderDots();
 
   const panel = document.querySelector(".shop-panel");
   if (panel) buildShopPanel(panel);
 
-  // Visual selection and the global UI color both follow cart truth.
-  const syncSelection = () => {
-    setActiveColor(entries);
-    for (const { entry, state } of jellyStates) {
-      state.setSelected(window.Shop.has(entry.slug));
+  // Visual selection and the global UI color both follow cart truth. While
+  // the selection board is open it re-mounts so picks appear/disappear live;
+  // any other open board just refreshes its outlines. The dots re-render so
+  // the selection dot appears and vanishes with the cart.
+  document.addEventListener("shop:change", () => {
+    const list = dotLayouts();
+    if (list[activeIndex]?.id === SELECTION_LAYOUT_ID) {
+      mountLayout(list[activeIndex]);
+    } else if (activeIndex >= list.length) {
+      // the selection board vanished with the cart — fall back to board one
+      activeIndex = 0;
+      mountLayout(list[0]);
+    } else {
+      syncSelection();
     }
-  };
-  document.addEventListener("shop:change", syncSelection);
-  syncSelection();
+    renderDots();
+  });
 }
 
 const SHOW_GRID_NODES = false; // flip to true to debug node alignment

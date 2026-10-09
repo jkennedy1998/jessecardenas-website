@@ -892,5 +892,15 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     }
   });
 
-  return { create, createJelly, nodePoint, nearestNode };
+  // Board swaps (public layouts carousel) tear a mounted earring down:
+  // leave the shared rAF loop and drop the element. The physics loop holds
+  // items by reference, so a removed DOM element without this would keep
+  // updating (and re-appending via pointer work) forever.
+  function destroy(state) {
+    const index = items.findIndex((item) => item.state === state);
+    if (index !== -1) items.splice(index, 1);
+    state.dangle?.remove();
+  }
+
+  return { create, createJelly, destroy, nodePoint, nearestNode };
 })();
