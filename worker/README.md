@@ -18,6 +18,13 @@ or login flow. Each Stripe Product can be given:
 The Worker binds those values to Stripe's immutable Product ID, so edits to a
 Product name, description, or default Price cannot detach its prepared art.
 
+## board layouts
+
+Saved display layouts (name + ordered `[{productId, node}]` placements) live in
+the same Durable Object. Studio CRUD is password-gated; `GET /api/layouts` is
+public and returns every layout ordered by `order`. Stock never edits a layout:
+a sold-out placement just renders as an empty slot on the public board.
+
 ## checkout lifecycle
 
 The Worker atomically reserves the requested individual units before it creates

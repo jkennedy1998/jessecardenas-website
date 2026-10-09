@@ -1,6 +1,11 @@
 const encoder = new TextEncoder();
 const SESSION_LIFETIME_SECONDS = 30 * 60;
 
+// Must match the grate's node map in js/dangle.js (10 wires x 10 rows).
+const BOARD_NODE_COUNT = 90;
+const MAX_LAYOUTS = 50;
+const MAX_LAYOUT_NAME = 120;
+
 class HttpError extends Error {
   constructor(status, message) {
     super(message);
@@ -20,7 +25,7 @@ function corsHeaders(request, env) {
   if (!origin || origin !== env.SITE_ORIGIN) return {};
   return {
     'access-control-allow-origin': origin,
-    'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+    'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'access-control-allow-headers': 'content-type, stripe-signature',
     vary: 'origin',
   };
@@ -131,6 +136,7 @@ export class InventoryLock {
 
   listingKey(productId) { return `listing:${productId}`; }
   reservationKey(id) { return `reservation:${id}`; }
+  layoutKey(id) { return `layout:${id}`; }
 
   // Expired pending holds flip to released without touching listing stock —
   // quantity was never decremented at reserve time, so there is nothing to
@@ -297,6 +303,77 @@ export class InventoryLock {
     return json({ listing });
   }
 
+  // Display layouts: each is one full board of placements. Stock never edits
+  // a layout — a sold-out placement just renders as an empty slot (J's call),
+  // so the public surface is a plain projection and validation is structural
+  // only. Studio CRUD is Access-gated upstream; /api/layouts is public read.
+  async layouts() {
+    const stored = await this.state.storage.list({ prefix: 'layout:' });
+    return [...stored.values()].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  }
+
+  async listLayouts() {
+    return json({ layouts: await this.layouts() }, 200, { 'cache-control': 'no-store' });
+  }
+
+  parseLayoutItems(value) {
+    if (!Array.isArray(value) || value.length > BOARD_NODE_COUNT) {
+      throw new HttpError(400, 'Layout items are invalid.');
+    }
+    const seenProducts = new Set();
+    const seenNodes = new Set();
+    return value.map((item) => {
+      const productId = typeof item?.productId === 'string' ? item.productId : '';
+      const node = Number(item?.node);
+      if (!productId || seenProducts.has(productId) || !Number.isSafeInteger(node)
+        || node < 1 || node > BOARD_NODE_COUNT || seenNodes.has(node)) {
+        throw new HttpError(400, 'Layout items are invalid.');
+      }
+      seenProducts.add(productId);
+      seenNodes.add(node);
+      return { productId, node };
+    });
+  }
+
+  async createLayout(request) {
+    const input = await request.json().catch(() => null);
+    const name = typeof input?.name === 'string' ? input.name.trim() : '';
+    if (!name || name.length > MAX_LAYOUT_NAME) {
+      throw new HttpError(400, 'A layout name is required.');
+    }
+    if ((await this.state.storage.list({ prefix: 'layout:' })).size >= MAX_LAYOUTS) {
+      throw new HttpError(400, 'The layout board is full.');
+    }
+    const layout = {
+      id: crypto.randomUUID(),
+      name,
+      order: Math.max(0, ...(await this.layouts()).map((layout) => layout.order)) + 1,
+      items: [],
+    };
+    await this.state.storage.put(this.layoutKey(layout.id), layout);
+    return json({ layout });
+  }
+
+  async saveLayout(request, id) {
+    const stored = await this.state.storage.get(this.layoutKey(id));
+    if (!stored) throw new HttpError(404, 'That layout does not exist.');
+    const input = await request.json().catch(() => null);
+    const name = typeof input?.name === 'string' ? input.name.trim() : '';
+    if (!name || name.length > MAX_LAYOUT_NAME) {
+      throw new HttpError(400, 'A layout name is required.');
+    }
+    const layout = { ...stored, name, items: this.parseLayoutItems(input?.items) };
+    await this.state.storage.put(this.layoutKey(id), layout);
+    return json({ layout });
+  }
+
+  async deleteLayout(id) {
+    const stored = await this.state.storage.get(this.layoutKey(id));
+    if (!stored) throw new HttpError(404, 'That layout does not exist.');
+    await this.state.storage.delete(this.layoutKey(id));
+    return json({ deleted: id });
+  }
+
   async createCheckout(request) {
     await this.releaseExpiredReservations();
     const body = await request.json().catch(() => null);
@@ -352,7 +429,16 @@ export class InventoryLock {
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/api/catalog') return this.catalog();
+    if (request.method === 'GET' && url.pathname === '/api/layouts') return this.listLayouts();
     if (request.method === 'GET' && url.pathname === '/api/studio/listings') return this.studioListings();
+    if (request.method === 'GET' && url.pathname === '/api/studio/layouts') return this.listLayouts();
+    if (request.method === 'POST' && url.pathname === '/api/studio/layouts') return this.createLayout(request);
+    if (request.method === 'PUT' && url.pathname.startsWith('/api/studio/layouts/')) {
+      return this.saveLayout(request, decodeURIComponent(url.pathname.slice('/api/studio/layouts/'.length)));
+    }
+    if (request.method === 'DELETE' && url.pathname.startsWith('/api/studio/layouts/')) {
+      return this.deleteLayout(decodeURIComponent(url.pathname.slice('/api/studio/layouts/'.length)));
+    }
     if (request.method === 'PUT' && url.pathname.startsWith('/api/studio/listings/')) {
       return this.saveStudioListing(request, decodeURIComponent(url.pathname.slice('/api/studio/listings/'.length)));
     }
@@ -371,7 +457,7 @@ export default {
       const isStudioApi = url.pathname.startsWith('/api/studio/');
       if (isStudioPage || isStudioApi) await requireStudioAccess(request, env);
       if (isStudioPage) return fetch(request);
-      const handled = request.method === 'GET' && url.pathname === '/api/catalog'
+      const handled = request.method === 'GET' && ['/api/catalog', '/api/layouts'].includes(url.pathname)
         || request.method === 'POST' && ['/api/checkout', '/api/webhooks/stripe'].includes(url.pathname)
         || isStudioApi;
       const response = handled

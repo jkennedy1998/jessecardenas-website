@@ -10,6 +10,7 @@ function memoryStorage() {
       get: async (key) => values.get(key),
       put: async (key, value) => values.set(key, structuredClone(value)),
       list: async ({ prefix }) => new Map([...values].filter(([key]) => key.startsWith(prefix))),
+      delete: async (key) => values.delete(key),
       transaction: async (callback) => callback({
         get: async (key) => values.get(key),
         put: async (key, value) => values.set(key, structuredClone(value)),
@@ -23,6 +24,85 @@ const reservationId = (values) => [...values.keys()]
   .filter((key) => key.startsWith('reservation:'))
   .map((key) => values.get(key))
   .find((reservation) => reservation.status === 'pending')?.id;
+
+test('board layouts: public read, studio CRUD, validation', { concurrency: false }, async () => {
+  const { storage, values } = memoryStorage();
+  const env = { STRIPE_SECRET_KEY: 'test', SITE_ORIGIN: 'https://jessecardenas.com', STUDIO_PASSWORD: 'pw' };
+  const lock = new InventoryLock({ storage }, env);
+  const req = (path, init = {}) => lock.fetch(new Request(`https://jessecardenas.com${path}`, {
+    headers: { 'content-type': 'application/json' }, ...init,
+  }));
+
+  // Public read with no layouts yet — no auth needed for /api/layouts.
+  const empty = await (await req('/api/layouts')).json();
+  assert.deepEqual(empty.layouts, []);
+
+  const created = await (await req('/api/studio/layouts', {
+    method: 'POST', body: JSON.stringify({ name: 'front wall' }),
+  })).json();
+  assert.equal(created.layout.name, 'front wall');
+  assert.deepEqual(created.layout.items, []);
+  const id = created.layout.id;
+
+  const saved = await (await req(`/api/studio/layouts/${id}`, {
+    method: 'PUT', body: JSON.stringify({ name: 'front wall', items: [
+      { productId: 'prod_purple', node: 12 },
+    ] }),
+  })).json();
+  assert.deepEqual(saved.layout.items, [{ productId: 'prod_purple', node: 12 }]);
+
+  const second = await (await req('/api/studio/layouts', {
+    method: 'POST', body: JSON.stringify({ name: 'back wall' }),
+  })).json();
+  const publicList = await (await req('/api/layouts')).json();
+  assert.deepEqual(publicList.layouts.map((layout) => layout.name), ['front wall', 'back wall']);
+  assert.ok(second.layout.order > created.layout.order);
+
+  // Structural validation: bad node, duplicate node, duplicate product.
+  // Routed through the app wrapper so HttpError maps to a real status.
+  const workerEnv = {
+    ...env,
+    INVENTORY_LOCK: { idFromName: () => 'catalog', get: () => ({ fetch: (request) => lock.fetch(request) }) },
+  };
+  const studioReq = (path, init = {}) => app.fetch(new Request(`https://jessecardenas.com${path}`, {
+    headers: { 'content-type': 'application/json', authorization: `Basic ${btoa('jesse:pw')}` }, ...init,
+  }), workerEnv);
+  for (const items of [
+    [{ productId: 'a', node: 0 }],
+    [{ productId: 'a', node: 91 }],
+    [{ productId: 'a', node: 3 }, { productId: 'b', node: 3 }],
+    [{ productId: 'a', node: 3 }, { productId: 'a', node: 4 }],
+    [{ productId: 'a' }],
+    'nope',
+  ]) {
+    const bad = await studioReq(`/api/studio/layouts/${id}`, {
+      method: 'PUT', body: JSON.stringify({ name: 'front wall', items }),
+    });
+    assert.equal(bad.status, 400, `expected 400 for ${JSON.stringify(items)}`);
+  }
+  assert.equal((await studioReq(`/api/studio/layouts/${id}`, {
+    method: 'PUT', body: JSON.stringify({ name: '' }),
+  })).status, 400);
+  assert.equal((await studioReq('/api/studio/layouts/missing', {
+    method: 'PUT', body: JSON.stringify({ name: 'x', items: [] }),
+  })).status, 404);
+  // /api/layouts stays public while studio layout CRUD stays gated.
+  assert.equal((await app.fetch(new Request('https://jessecardenas.com/api/layouts'), workerEnv)).status, 200);
+  assert.equal((await app.fetch(new Request('https://jessecardenas.com/api/studio/layouts', {
+    headers: { authorization: `Basic ${btoa('jesse:pw')}` },
+  }), workerEnv)).status, 200);
+  const originalError = console.error;
+  console.error = () => {};
+  const denied = await app.fetch(new Request('https://jessecardenas.com/api/studio/layouts'), workerEnv);
+  console.error = originalError;
+  assert.equal(denied.status, 401);
+
+  const deleted = await (await studioReq(`/api/studio/layouts/${id}`, { method: 'DELETE' })).json();
+  assert.equal(deleted.deleted, id);
+  assert.equal((await studioReq(`/api/studio/layouts/${id}`, { method: 'DELETE' })).status, 404);
+  const after = await (await req('/api/layouts')).json();
+  assert.deepEqual(after.layouts.map((layout) => layout.name), ['back wall']);
+});
 
 const product = {
   id: 'prod_purple',

@@ -1,3 +1,21 @@
+### 2026-10-09-board-layouts-are-display-truth
+- j-quote: "All of the earrings and the board should refresh once the user changes which board they're looking at."
+- j-quote: "Even if a user has an earring selected that earring should disappear because it's part of another board the earring should still stay selected if it's within the right UI and selected for purchase but the user only sees the photographs of the earring that they're looking at on the board."
+- interpretation: a saved layout is the full display truth for its board — switching boards swaps the whole grid; cart selection persists even when the selected earring is not on the visible board.
+
+### 2026-10-09-selection-board
+- j-quote: "we have a board that's the always the last on the index of boards and is only around if the user has any earrings selected."
+- j-quote: "Jesse should not be able to change that last page that we talked about in the answer to question 1 that basically resembles the users cart."
+- interpretation: a final auto board appears only while the user has selections and shows every selected earring for viewing/deselecting; it is never authorable; the cart may render there later but stays a separate page for now.
+
+### 2026-10-09-soldout-slots-empty
+- j-quote: "If a placed earring sells out the slot should go emty."
+- interpretation: layouts keep placements; sold-out earrings render as empty slots and stock never auto-edits a layout.
+
+### 2026-10-09-pickers-hide-zero-stock
+- j-quote: "any earrings with a quantity over one should be displayed and we should not display any earrings with the quantity below one. This should be true for the website and for the UX where Jesse is choosing which earrings to drag into a display at a given time."
+- interpretation: available >= 1 is the single visibility filter for both the public board and the studio layout picker; one-offs that sold out never pollute either view.
+
 ### 2026-04-02-stripe-source
 - j-quote: "earings current listings have to derrive from the listings on stripe."
 - interpretation: Stripe Products, not static site files, are the live listing source.
