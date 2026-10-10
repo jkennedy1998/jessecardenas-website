@@ -203,7 +203,7 @@ main { flex: 1; }
 }
 
 .earring-board {
-  transition: transform 0.42s cubic-bezier(0.45, 0, 0.55, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .earring-board.is-leaving-left,
@@ -212,15 +212,22 @@ main { flex: 1; }
 .earring-board.is-leaving-right,
 .earring-board.is-entering-left { transform: translateX(85%); }
 
-/* entry legs jump instantly to their off-stage start point; leaving the
-   class then eases the board back to rest */
+/* entry legs jump instantly to their off-stage start point (also fully
+   transparent); leaving the class then eases the board back to rest. The
+   whole swap happens while the board is invisible, so one grid appears to
+   replace the other with no visible content pop. */
 .earring-board.is-entering-left,
-.earring-board.is-entering-right { transition: none; }
+.earring-board.is-entering-right { transition: none; opacity: 0; }
 
 .earring-board.is-leaving-left,
 .earring-board.is-leaving-right {
-  transition: transform 0.42s cubic-bezier(0.45, 0, 0.55, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
 }
+
+/* a switching board ignores the pointer so a mid-swap hover or drag can
+   never grab a dying earring */
+.earring-board.is-switching { pointer-events: none; }
 
 .earring-dangle {
   position: absolute;
@@ -716,6 +723,8 @@ body.has-selection.is-selling-open .shop-panel {
 .layout-picker { position: relative; }
 
 .layout-picker-button { cursor: pointer; text-align: left; }
+
+.layout-picker-panel[hidden] { display: none; }
 
 .layout-picker-panel {
   position: absolute;

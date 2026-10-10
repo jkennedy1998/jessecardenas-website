@@ -679,12 +679,14 @@ async function initEarringsPage() {
     if (switching || index === activeIndex || !list[index]) return;
     switching = true;
     const forward = index > activeIndex;
+    board.classList.add("is-switching");
+    board.classList.add(forward ? "is-leaving-left" : "is-leaving-right");
     let settled = false;
     const settle = () => {
       if (settled) return;
       settled = true;
       clearTimeout(guard);
-      board.removeEventListener("transitionend", settle);
+      board.removeEventListener("transitionend", onEnd);
       activeIndex = index;
       board.classList.remove("is-leaving-left", "is-leaving-right");
       board.classList.add(forward ? "is-entering-right" : "is-entering-left");
@@ -692,12 +694,18 @@ async function initEarringsPage() {
       renderDots();
       requestAnimationFrame(() => requestAnimationFrame(() => {
         board.classList.remove("is-entering-right", "is-entering-left");
-        // one slide is 0.42s; clear the switch lock after it settles
-        setTimeout(() => { switching = false; }, 450);
+        board.classList.remove("is-switching");
+        // one slide is 0.3s; clear the switch lock after it settles
+        setTimeout(() => { switching = false; }, 320);
       }));
     };
-    const guard = setTimeout(settle, 500);
-    board.addEventListener("transitionend", settle);
+    const guard = setTimeout(settle, 360);
+    // only the board's own transform transition ends the leave leg — child
+    // transitions bubble and would swap the content mid-slide
+    const onEnd = (event) => {
+      if (event.target === board && event.propertyName === "transform") settle();
+    };
+    board.addEventListener("transitionend", onEnd);
   }
 
   function syncSelection() {

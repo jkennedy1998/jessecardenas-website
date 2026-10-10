@@ -192,13 +192,21 @@ window.StudioLayouts = (() => {
     pickerButton.disabled = !options.length;
   }
 
-  const closePicker = () => pickerPanel.hidden = true;
+  const closePicker = () => { pickerPanel.hidden = true; };
 
   pickerButton.addEventListener("click", () => {
     pickerPanel.hidden = !pickerPanel.hidden;
   });
-  document.addEventListener("click", (event) => {
-    if (!pickerPanel.hidden && !root.contains(event.target)) closePicker();
+
+  // The panel must never linger: any press outside the picker control closes
+  // it (pointerdown, so it is gone before the click lands on save/the board),
+  // and Escape closes it from anywhere.
+  const pickerWrap = root.querySelector(".layout-picker");
+  document.addEventListener("pointerdown", (event) => {
+    if (!pickerPanel.hidden && !pickerWrap.contains(event.target)) closePicker();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closePicker();
   });
 
   function render() {
