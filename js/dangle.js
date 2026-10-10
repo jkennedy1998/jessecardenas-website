@@ -84,6 +84,15 @@ const SWING_V_MAX = 1.2; // rad/s, swing velocity cap
 const SWING_BREEZE = 0.05; // ambient breeze strength on the swing
 const SWING_HOVER = 0.26; // rad/s, swing impulse on hover
 const SWING_PICKUP = 0.44; // rad/s, swing impulse on pickup
+// Board switch: sliding the grate sideways shoves the hanging pieces —
+// inertia makes them lag the slide, swing back, and turn a little
+// through their frames before settling. The shove kicks opposite to
+// travel (lag), magnitude jittered per earring so they never move in
+// lockstep (see switchKick).
+const SWITCH_SHOVE = 0.4; // rad/s, inertial swing shove (jelly path)
+const SWITCH_SHOVE_DIAL = 4; // rad/s, frame-dial shove (jelly path)
+const SWITCH_SHOVE_LEGACY = 1.4; // rad/s, pendulum shove (legacy path)
+const SWITCH_SHOVE_JITTER = 0.8; // +-80% per-earring magnitude jitter
 // Contact shadow: the photo's own silhouette, blurred and tinted black,
 // drawn just below the body — then masked by the grate png's alpha so the
 // shadow only lands on the wire grid, never on the page background.
@@ -902,5 +911,25 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     state.dangle?.remove();
   }
 
-  return { create, createJelly, destroy, nodePoint, nearestNode };
+  // Inertial shove for board switches (components.js switchTo calls it
+  // once per leg). `travel` is the board content's travel direction on
+  // screen (+1 right / -1 left); the shove kicks opposite to it, so the
+  // pieces trail the slide and the springs swing them back. Both
+  // renderer paths get it: jelly pieces swing + turn through frames,
+  // legacy pendulums swing.
+  function switchKick(travel) {
+    if (REDUCED || !travel) return;
+    for (const { state } of items) {
+      if (state.fixedHome) continue; // showcase embeds ride nothing
+      const jitter = 1 + (Math.random() * 2 - 1) * SWITCH_SHOVE_JITTER;
+      if (typeof state.swingVel === "number") {
+        state.swingVel -= SWITCH_SHOVE * travel * jitter;
+        state.dialVel -= SWITCH_SHOVE_DIAL * travel * jitter;
+      } else {
+        state.velocity -= SWITCH_SHOVE_LEGACY * travel * jitter;
+      }
+    }
+  }
+
+  return { create, createJelly, destroy, switchKick, nodePoint, nearestNode };
 })();

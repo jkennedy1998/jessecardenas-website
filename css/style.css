@@ -202,27 +202,60 @@ main { flex: 1; }
   background: var(--active-mid, #7a6f66);
 }
 
-.earring-board {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+/* board switch: one shared keyframe pair per leg drives every grid.
+   leaving: hard ease-in (slow start, fast end) — the grate and the
+   earrings on it hold full opacity for the first half, then fade out
+   together over the second. entering: ease-out (fast start, slow end),
+   same duration, fading in over its own second half. Each leg runs
+   --board-switch-time; js/components.js switchTo keeps its settle guard
+   in sync with that constant. */
+.earring-board { --board-switch-time: 0.45s; }
+
+@keyframes board-switch-out-left {
+  from { transform: translateX(0); opacity: 1; }
+  50% { opacity: 1; animation-timing-function: linear; }
+  to { transform: translateX(-85%); opacity: 0; }
 }
 
-.earring-board.is-leaving-left,
-.earring-board.is-entering-right { transform: translateX(-85%); }
+@keyframes board-switch-out-right {
+  from { transform: translateX(0); opacity: 1; }
+  50% { opacity: 1; animation-timing-function: linear; }
+  to { transform: translateX(85%); opacity: 0; }
+}
 
-.earring-board.is-leaving-right,
-.earring-board.is-entering-left { transform: translateX(85%); }
+@keyframes board-switch-in-left {
+  from { transform: translateX(-85%); opacity: 0; }
+  50% { opacity: 0; animation-timing-function: linear; }
+  to { transform: translateX(0); opacity: 1; }
+}
 
-/* entry legs jump instantly to their off-stage start point (also fully
-   transparent); leaving the class then eases the board back to rest. The
-   whole swap happens while the board is invisible, so one grid appears to
-   replace the other with no visible content pop. */
-.earring-board.is-entering-left,
-.earring-board.is-entering-right { transition: none; opacity: 0; }
+@keyframes board-switch-in-right {
+  from { transform: translateX(85%); opacity: 0; }
+  50% { opacity: 0; animation-timing-function: linear; }
+  to { transform: translateX(0); opacity: 1; }
+}
 
-.earring-board.is-leaving-left,
+.earring-board.is-leaving-left {
+  animation: board-switch-out-left var(--board-switch-time) cubic-bezier(0.895, 0.03, 0.685, 0.22) both;
+}
+
 .earring-board.is-leaving-right {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 0;
+  animation: board-switch-out-right var(--board-switch-time) cubic-bezier(0.895, 0.03, 0.685, 0.22) both;
+}
+
+.earring-board.is-entering-left {
+  animation: board-switch-in-left var(--board-switch-time) cubic-bezier(0.165, 0.84, 0.44, 1) both;
+}
+
+.earring-board.is-entering-right {
+  animation: board-switch-in-right var(--board-switch-time) cubic-bezier(0.165, 0.84, 0.44, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .earring-board.is-leaving-left,
+  .earring-board.is-leaving-right { opacity: 0; }
+  .earring-board.is-entering-left,
+  .earring-board.is-entering-right { animation: none; }
 }
 
 /* a switching board ignores the pointer so a mid-swap hover or drag can

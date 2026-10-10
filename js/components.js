@@ -671,41 +671,57 @@ async function initEarringsPage() {
     });
   }
 
-  // Slide the current board off (eased, ~85% of its width), swap the
-  // content while it is gone, then slide the next board in from the far
-  // side. Direction follows the dot the user moved to.
+  // Slide the current board off (hard ease-in: slow start, fast end;
+  // grate + earrings fade out together over the back half), swap the
+  // content while it is gone, then slide the next in from the far side
+  // (ease-out: fast start, slow end, fading in over the back half). Both
+  // legs run --board-switch-time (0.45s, css/style.css); keep the settle
+  // guards below in sync with it. The earrings get an inertial shove on
+  // each leg (Dangle.switchKick). Direction follows the dot the user
+  // moved to.
+  const BOARD_SWITCH_MS = 450;
   function switchTo(index) {
     const list = dotLayouts();
     if (switching || index === activeIndex || !list[index]) return;
     switching = true;
     const forward = index > activeIndex;
-    board.classList.add("is-switching");
-    board.classList.add(forward ? "is-leaving-left" : "is-leaving-right");
+    const travel = forward ? -1 : 1; // forward content slides left
+    board.classList.add("is-switching", forward ? "is-leaving-left" : "is-leaving-right");
+    window.Dangle.switchKick(travel);
     let settled = false;
     const settle = () => {
       if (settled) return;
       settled = true;
       clearTimeout(guard);
-      board.removeEventListener("transitionend", onEnd);
+      board.removeEventListener("animationend", onLeaveEnd);
       activeIndex = index;
       board.classList.remove("is-leaving-left", "is-leaving-right");
       board.classList.add(forward ? "is-entering-right" : "is-entering-left");
       mountLayout(list[index]);
       renderDots();
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        board.classList.remove("is-entering-right", "is-entering-left");
-        board.classList.remove("is-switching");
-        // one slide is 0.3s; clear the switch lock after it settles
-        setTimeout(() => { switching = false; }, 320);
-      }));
+      window.Dangle.switchKick(travel);
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(finishGuard);
+        board.removeEventListener("animationend", onEnterEnd);
+        board.classList.remove("is-entering-right", "is-entering-left", "is-switching");
+        switching = false;
+      };
+      const finishGuard = setTimeout(finish, BOARD_SWITCH_MS + 60);
+      const onEnterEnd = (event) => {
+        if (event.target === board && event.animationName.startsWith("board-switch-in")) finish();
+      };
+      board.addEventListener("animationend", onEnterEnd);
     };
-    const guard = setTimeout(settle, 360);
-    // only the board's own transform transition ends the leave leg — child
-    // transitions bubble and would swap the content mid-slide
-    const onEnd = (event) => {
-      if (event.target === board && event.propertyName === "transform") settle();
+    const guard = setTimeout(settle, BOARD_SWITCH_MS + 60);
+    // only the board's own leave animation ends the leg — child events
+    // bubble and would swap the content mid-slide
+    const onLeaveEnd = (event) => {
+      if (event.target === board && event.animationName.startsWith("board-switch-out")) settle();
     };
-    board.addEventListener("transitionend", onEnd);
+    board.addEventListener("animationend", onLeaveEnd);
   }
 
   function syncSelection() {
