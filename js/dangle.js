@@ -89,9 +89,9 @@ const SWING_PICKUP = 0.44; // rad/s, swing impulse on pickup
 // through their frames before settling. The shove kicks opposite to
 // travel (lag), magnitude jittered per earring so they never move in
 // lockstep (see switchKick).
-const SWITCH_SHOVE = 0.4; // rad/s, inertial swing shove (jelly path)
-const SWITCH_SHOVE_DIAL = 4; // rad/s, frame-dial shove (jelly path)
-const SWITCH_SHOVE_LEGACY = 1.4; // rad/s, pendulum shove (legacy path)
+const SWITCH_SHOVE = 0.95; // rad/s, inertial swing shove (jelly path)
+const SWITCH_SHOVE_DIAL = 9; // rad/s, frame-dial shove (jelly path)
+const SWITCH_SHOVE_LEGACY = 2.6; // rad/s, pendulum shove (legacy path)
 const SWITCH_SHOVE_JITTER = 0.8; // +-80% per-earring magnitude jitter
 // Contact shadow: the photo's own silhouette, blurred and tinted black,
 // drawn just below the body — then masked by the grate png's alpha so the
