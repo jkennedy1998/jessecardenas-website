@@ -286,5 +286,37 @@
       "count": 24,
       "frameMs": 33
     }
+  },
+  "soapy-water-earring": {
+    "slug": "soapy-water-earring",
+    "node": 37,
+    "colors": {
+      "accent": "bluie"
+    },
+    "frames": {
+      "sheet": "intake/soapy-water-earring--561d509e/frames.png",
+      "fw": 474,
+      "fh": 757,
+      "cols": 8,
+      "rows": 3,
+      "count": 24,
+      "frameMs": 33
+    }
+  },
+  "yellow-triangle": {
+    "slug": "yellow-triangle",
+    "node": 38,
+    "colors": {
+      "accent": "yellow"
+    },
+    "frames": {
+      "sheet": "intake/yellow-triangle--1bded4d0/frames.png",
+      "fw": 484,
+      "fh": 724,
+      "cols": 8,
+      "rows": 3,
+      "count": 24,
+      "frameMs": 33
+    }
   }
 }
