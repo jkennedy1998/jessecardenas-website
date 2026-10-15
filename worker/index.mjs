@@ -250,7 +250,7 @@ export class InventoryLock {
       // the unit unavailable without it having been sold yet.
       const available = listing.quantity - (reservedByProduct.get(product.id) || 0);
       if (available < 1) continue;
-      listings.push({ ...details, quantity: available, graphicKey: listing.graphicKey });
+      listings.push({ ...details, quantity: available, graphicKey: listing.graphicKey, sizePercent: listing.sizePercent || 100 });
     }
     return json({ listings }, 200, { 'cache-control': 'no-store' });
   }
@@ -280,6 +280,7 @@ export class InventoryLock {
         available: Math.max(0, (listing?.quantity || 0) - (reservedByProduct.get(product.id) || 0)),
         published: listing?.published || false,
         graphicKey: listing?.graphicKey || '',
+        sizePercent: listing?.sizePercent || 100,
       });
     }
     return json({ listings });
@@ -290,15 +291,21 @@ export class InventoryLock {
     const quantity = Number(input?.quantity);
     const published = input?.published;
     const graphicKey = typeof input?.graphicKey === 'string' ? input.graphicKey.trim() : '';
+    // sizePercent is Jesse's per-listing display-size hone: 5% steps the
+    // Studio stepper applies around the board's base scale. Default 100.
+    const rawSize = input?.sizePercent === undefined ? 100 : Number(input?.sizePercent);
     if (!Number.isSafeInteger(quantity) || quantity < 0 || typeof published !== 'boolean' || !graphicKey) {
       throw new HttpError(400, 'Stock, graphic, and publish status are required.');
+    }
+    if (!Number.isSafeInteger(rawSize) || rawSize < 50 || rawSize > 200 || rawSize % 5 !== 0) {
+      throw new HttpError(400, 'Size must be a multiple of 5 between 50% and 200%.');
     }
     // No Stripe round-trip here on purpose: a save must be a deterministic
     // local write. A transient Stripe failure used to fail the whole save,
     // which read as "the studio update is finicky". Listings only surface
     // through studioListings for Products Stripe actually returns, so a
     // phantom productId is inert.
-    const listing = { productId, quantity, published, graphicKey };
+    const listing = { productId, quantity, published, graphicKey, sizePercent: rawSize };
     await this.state.storage.put(this.listingKey(productId), listing);
     return json({ listing });
   }

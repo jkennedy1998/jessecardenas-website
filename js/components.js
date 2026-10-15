@@ -4,6 +4,10 @@
 // directly from disk (file://) and behind any static server.
 const ROOT = new URL("../", document.currentScript.src).pathname;
 
+// Board default earring scale. Lowered when the intake became high-res video
+// sheets; Studio's per-listing sizePercent multiplies on top of this base.
+const BOARD_BASE_SCALE = 0.55;
+
 const NAV = [
   ["", "jesse cardenas"],
   ["earrings/", "earrings"],
@@ -614,7 +618,9 @@ async function initEarringsPage() {
         // paths) — the page lives under /earrings/ but assets live at /source/
         const frames = { ...entry.frames, sheet: normalizeMediaPath(entry.frames.sheet) };
         const jellyState = window.Dangle.createJelly(dangle, {
-          node: entry.node, frames, scale: 0.7, length: 140,
+          // Base scale is tuned down for the high-res intake sheets; each
+          // listing's Studio sizePercent (5% steps) hones it from here.
+          node: entry.node, frames, scale: BOARD_BASE_SCALE * ((entry.sizePercent || 100) / 100), length: 140,
           accentColor: paletteFor(entry.colors?.accent).dark,
           onSelect: () => window.Shop.toggle(entry),
           onHover: (state) => {

@@ -56,6 +56,26 @@ window.Studio = (() => {
     }
     graphicLabel.append(graphic);
 
+    const sizeLabel = document.createElement('label');
+    sizeLabel.textContent = 'size on board (5% steps)';
+    const sizeRow = document.createElement('div');
+    sizeRow.className = 'studio-size';
+    let sizePercent = listing.sizePercent || 100;
+    const sizeReadout = document.createElement('span');
+    sizeReadout.textContent = `${sizePercent}%`;
+    const sizeButton = (delta) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = delta > 0 ? '+5%' : '−5%';
+      button.addEventListener('click', () => {
+        sizePercent = Math.min(200, Math.max(50, sizePercent + delta));
+        sizeReadout.textContent = `${sizePercent}%`;
+      });
+      return button;
+    };
+    sizeRow.append(sizeButton(-5), sizeReadout, sizeButton(5));
+    sizeLabel.append(sizeRow);
+
     const publishLabel = document.createElement('label');
     publishLabel.className = 'studio-check';
     const published = document.createElement('input');
@@ -87,6 +107,7 @@ window.Studio = (() => {
             quantity: Number(stock.value),
             graphicKey: graphic.value,
             published: published.checked,
+            sizePercent,
           }),
         });
         const result = await response.json().catch(() => ({}));
@@ -102,7 +123,7 @@ window.Studio = (() => {
       }
     });
 
-    card.append(heading, thumb, detail, stockLabel, graphicLabel, publishLabel, held, save);
+    card.append(heading, thumb, detail, stockLabel, graphicLabel, sizeLabel, publishLabel, held, save);
     return card;
   }
 

@@ -829,6 +829,9 @@ body.has-selection.is-selling-open .shop-panel {
   font: inherit;
 }
 .studio-card .studio-check { display: flex; align-items: center; gap: 0.5rem; }
+.studio-card .studio-size { display: flex; align-items: center; gap: 0.5rem; }
+.studio-card .studio-size button { padding: 0.35rem 0.6rem; font-size: 0.72rem; justify-self: auto; }
+.studio-card .studio-size span { min-width: 3.2rem; text-align: center; font-variant-numeric: tabular-nums; }
 .studio-card button {
   justify-self: start;
   border: 0;

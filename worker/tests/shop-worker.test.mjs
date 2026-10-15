@@ -134,16 +134,17 @@ test('Studio publishes Product-ID inventory; checkout holds, payment decrements'
     const saved = await (await lock.fetch(new Request('https://jessecardenas.com/api/studio/listings/prod_purple', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ quantity: 2, graphicKey: 'purple-lollypop', published: true }),
+      body: JSON.stringify({ quantity: 2, graphicKey: 'purple-lollypop', published: true, sizePercent: 105 }),
     }))).json();
     // Saving is a pure local write: no Stripe call can fail it.
     assert.equal(saved.listing.quantity, 2);
+    assert.equal(saved.listing.sizePercent, 105);
 
     const catalog = await (await lock.fetch(new Request('https://jessecardenas.com/api/catalog'))).json();
     assert.deepEqual(catalog.listings[0], {
       productId: 'prod_purple', title: 'Purple lollypop', description: 'Glass candy.',
       materials: 'glass', price: 52, currency: 'usd', priceId: 'price_purple', active: true,
-      image: '', quantity: 2, graphicKey: 'purple-lollypop',
+      image: '', quantity: 2, graphicKey: 'purple-lollypop', sizePercent: 105,
     });
 
     const checkout = await lock.fetch(new Request('https://jessecardenas.com/api/checkout', {
