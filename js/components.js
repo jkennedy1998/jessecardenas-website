@@ -6,7 +6,7 @@ const ROOT = new URL("../", document.currentScript.src).pathname;
 
 // Board default earring scale. Lowered when the intake became high-res video
 // sheets; Studio's per-listing sizePercent multiplies on top of this base.
-const BOARD_BASE_SCALE = 0.55;
+const BOARD_BASE_SCALE = 0.35;
 
 const NAV = [
   ["", "jesse cardenas"],
