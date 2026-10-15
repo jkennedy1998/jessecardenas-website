@@ -10,8 +10,9 @@
 //    back to rest. The frame sequence doubles as the rotation: the dial
 //    angle maps onto sequence percentage (one turn = the full loop, wrapping
 //    on 0 and last), so hover wiggles it, pickup wiggles it more, dragging
-//    yanks it through frames, and a lower-half swipe dials it around with a
-//    little momentum. A click toggles selection (stroke only, multi).
+//    yanks it through frames, and a fast horizontal flick released near
+//    home spins it in place with momentum. One gesture surface: tap
+//    selects, drag moves, flick spins. A click toggles selection (stroke only, multi).
 // 2. create — legacy two-piece split hang (top.png + bottom.png). Kept as a
 //    fallback for entries without frames.json.
 //
@@ -72,6 +73,8 @@ const DIAL_V_MAX = 15; // rad/s, dial velocity cap
 const HOVER_KICK = 9; // rad/s, wiggle impulse on hover
 const PICKUP_KICK = 14; // rad/s, bigger wiggle impulse on pickup
 const CLICK_PX = 6; // pointer travel below which a press is a click (select)
+const FLICK_TRAVEL_PX = 48; // max travel for a release to read as a flick-spin
+const FLICK_SPEED = 900; // px/s horizontal release speed to trigger a flick
 // Pivot swing: the png itself rotates around its top-center point (where the
 // hook hangs) like a real pendulum — separate from the dial (frame turn).
 // Softened gravity + damping give the piece a sense of weight; horizontal
@@ -155,14 +158,12 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
   }
 
   // Shared: begin/end drag + scale targets. `grabber` is the element that
-  // receives pointer events. opts.modeFor(event) may return "dial" to turn a
-  // press into a dial swipe (angle, not position) — e.g. the lower half of
-  // the earring body. A press released with almost no travel is a click and
-  // toggles selection.
-  function attachDrag(state, grabber, releaseExtra, opts = {}) {
+  // receives pointer events. One gesture surface — no zones: a press released
+  // with almost no travel is a click (select); a fast horizontal release with
+  // little net travel is a flick (spin in place); anything else is a move.
+  function attachDrag(state, grabber, releaseExtra) {
     grabber.addEventListener("pointerdown", (event) => {
       state.dragging = true;
-      state.dragMode = opts.modeFor ? opts.modeFor(event) : "move";
       state.dragMoved = 0;
       state.dragStart = { x: event.clientX, y: event.clientY, t: performance.now() };
       state.pointer = { x: event.clientX, y: event.clientY, t: performance.now() };
@@ -180,13 +181,11 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       const dx = event.clientX - state.pointer.x;
       const dy = event.clientY - state.pointer.y;
       state.dragMoved += Math.abs(dx) + Math.abs(dy);
-      if (state.dragMode === "dial") {
-        // dial swipe: horizontal travel turns the piece through its frames
-        state.angle += dx / DIAL_PX_PER_RAD;
-        const instantVel = (dx / dt) / DIAL_PX_PER_RAD;
-        state.dialVel = state.dialVel * 0.6 + instantVel * 0.4;
-        state.pointer = { x: event.clientX, y: event.clientY, t: now };
-        return;
+      // a real drag (past click range) releases the hover card — it is
+      // anchored to the pickup spot, which the moving earring has left
+      if (state.cardLive && state.dragMoved > CLICK_PX) {
+        state.cardLive = false;
+        if (state.onHover) state.onHover(null);
       }
       state.x = clamp(state.x + dx / state.hang.clientWidth, 0.08, 0.92);
       state.y = clamp(state.y + dy / state.hang.clientHeight, 0.08, 0.9);
@@ -210,8 +209,19 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         : Infinity;
       const brief = !state.dragStart || performance.now() - state.dragStart.t < 600;
       if (travel < CLICK_PX && brief && state.onSelect) state.onSelect();
+      // flick: a fast horizontal release that stayed near home spins the
+      // piece in place — like flicking a real earring on its hook. Sign
+      // matches the drag-follow coupling so the spin carries the motion.
+      const fast = Math.abs(state.pointerVelocityX || 0) > FLICK_SPEED;
+      const sideways = state.dragStart &&
+        Math.abs(event.clientX - state.dragStart.x) >
+        Math.abs(event.clientY - state.dragStart.y);
+      if (fast && sideways && travel < FLICK_TRAVEL_PX && !REDUCED) {
+        state.dialVel = clamp(
+          state.dialVel - (state.pointerVelocityX / DIAL_PX_PER_RAD),
+          -DIAL_V_MAX, DIAL_V_MAX);
+      }
       state.dragStart = null;
-      state.dragMode = "move";
       // showcase embeds keep their fixed home; board pieces drop onto the
       // nearest node, which becomes the earring's new home
       if (!state.fixedHome) {
@@ -430,17 +440,18 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       if (state.onHover) state.onHover(null);
     });
 
-    // Pickup keeps the outline alive either way. The hover card only stays up
-    // for a dial swipe (the earring itself holds still, just turning through
-    // its frames) — a full move-drag relocates the piece, so the card would
-    // be anchored to a spot the earring is no longer at; hide it for that.
+    // Pickup keeps the outline alive and shows the hover card; a real drag
+    // (past the click range) hides it again — the card is anchored to the
+    // pickup spot, which the moving earring has left. A tap or flick keeps
+    // the card up: the earring stays put (or returns home), so it's honest.
     state.onDragStart = () => {
       state.hovered = true;
       state.scaleTarget = state.baseScale * HOVER_SCALE;
       state.strokeTarget = STROKE_PX;
       state.syncStrokeColor();
       state.renderPivot();
-      if (state.onHover) state.onHover(state.dragMode === "dial" ? state : null);
+      state.cardLive = true;
+      if (state.onHover) state.onHover(state);
       if (!REDUCED) {
         state.dialVel += PICKUP_KICK * state.wiggleDir;
         state.swingVel += SWING_PICKUP * state.wiggleDir;
@@ -465,15 +476,9 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       if (onSelect) onSelect();
     };
 
-    attachDrag(state, hitArea, null, {
-      // Lower half of the tight interaction plane = dial swipe zone; upper
-      // half = grab/move. The painted canvas itself never captures input.
-      modeFor: (event) => {
-        const rect = hitArea.getBoundingClientRect();
-        const localY = event.clientY - rect.top;
-        return localY > rect.height * 0.5 ? "dial" : "move";
-      },
-    });
+    attachDrag(state, hitArea);
+    // One gesture surface on the tight interaction plane; the painted canvas
+    // itself never captures input.
 
     state.update = (dt, now) => {
       syncBoardScale(state);
@@ -608,10 +613,10 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       drawJelly(state);
       if (state.shadow) drawShadow(state);
       state.renderPivot();
-      // Same rule every frame: a dial swipe keeps the card up (the earring
-      // stays put), a full move-drag hides it (the earring doesn't).
+      // Same rule every frame: the card stays up while the earring stays
+      // put (tap, flick, hover) and drops once a real drag moves it.
       if (state.hovered && state.onHover) {
-        state.onHover(state.dragging && state.dragMode === "move" ? null : state);
+        state.onHover(state.dragging && !state.cardLive ? null : state);
       }
     };
 
