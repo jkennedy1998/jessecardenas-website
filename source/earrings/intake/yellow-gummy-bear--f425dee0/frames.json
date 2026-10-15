@@ -1,9 +1,9 @@
 {
   "sheet": "frames.png",
   "fw": 400,
-  "fh": 1193,
+  "fh": 666,
   "cols": 8,
-  "rows": 3,
-  "count": 24,
+  "rows": 6,
+  "count": 48,
   "frameMs": 33
 }

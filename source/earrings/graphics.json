@@ -7,11 +7,11 @@
     },
     "frames": {
       "sheet": "intake/bi-chandelier--4a20137c/frames.png",
-      "fw": 400,
-      "fh": 1187,
+      "fw": 396,
+      "fh": 607,
       "cols": 8,
-      "rows": 3,
-      "count": 18,
+      "rows": 5,
+      "count": 36,
       "frameMs": 33
     }
   },
@@ -23,11 +23,11 @@
     },
     "frames": {
       "sheet": "intake/blue-and-yellow-gummy-bear--36849a38/frames.png",
-      "fw": 400,
-      "fh": 1190,
+      "fw": 396,
+      "fh": 661,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -40,10 +40,10 @@
     "frames": {
       "sheet": "intake/blue-drop--17f1aad5/frames.png",
       "fw": 400,
-      "fh": 1192,
+      "fh": 762,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -55,11 +55,11 @@
     },
     "frames": {
       "sheet": "intake/blue-wood-drop--957cf86e/frames.png",
-      "fw": 400,
-      "fh": 1196,
+      "fw": 394,
+      "fh": 597,
       "cols": 8,
-      "rows": 3,
-      "count": 22,
+      "rows": 6,
+      "count": 43,
       "frameMs": 33
     }
   },
@@ -72,10 +72,10 @@
     "frames": {
       "sheet": "intake/green-puffball--5e6372bb/frames.png",
       "fw": 400,
-      "fh": 1188,
+      "fh": 760,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -88,10 +88,10 @@
     "frames": {
       "sheet": "intake/nb-chandelier--8c8bbf7c/frames.png",
       "fw": 400,
-      "fh": 1186,
+      "fh": 700,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -104,10 +104,10 @@
     "frames": {
       "sheet": "intake/nb-star-keychain--18d46bd6/frames.png",
       "fw": 400,
-      "fh": 926,
+      "fh": 1062,
       "cols": 8,
-      "rows": 3,
-      "count": 17,
+      "rows": 5,
+      "count": 33,
       "frameMs": 33
     }
   },
@@ -120,10 +120,10 @@
     "frames": {
       "sheet": "intake/orange-sugar-coated-meds--eb7d7b1f/frames.png",
       "fw": 400,
-      "fh": 1194,
+      "fh": 827,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -135,11 +135,11 @@
     },
     "frames": {
       "sheet": "intake/orange-three-chain--71af70fb/frames.png",
-      "fw": 400,
-      "fh": 1194,
+      "fw": 396,
+      "fh": 648,
       "cols": 8,
-      "rows": 3,
-      "count": 18,
+      "rows": 5,
+      "count": 35,
       "frameMs": 33
     }
   },
@@ -152,10 +152,10 @@
     "frames": {
       "sheet": "intake/pink-and-yellow-gummy-worm--193d437d/frames.png",
       "fw": 400,
-      "fh": 1186,
+      "fh": 749,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -168,10 +168,10 @@
     "frames": {
       "sheet": "intake/pink-chandelier--b258d0f0/frames.png",
       "fw": 400,
-      "fh": 1196,
+      "fh": 736,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -184,10 +184,10 @@
     "frames": {
       "sheet": "intake/pink-polymer-lollipop--a1740b68/frames.png",
       "fw": 400,
-      "fh": 1188,
+      "fh": 855,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -200,10 +200,10 @@
     "frames": {
       "sheet": "intake/purple-lollipop-chandelier--458d3b4b/frames.png",
       "fw": 400,
-      "fh": 1196,
+      "fh": 768,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -216,10 +216,10 @@
     "frames": {
       "sheet": "intake/rainbow-chandelier--b5d9235a/frames.png",
       "fw": 400,
-      "fh": 1194,
+      "fh": 821,
       "cols": 8,
-      "rows": 2,
-      "count": 12,
+      "rows": 3,
+      "count": 24,
       "frameMs": 33
     }
   },
@@ -231,11 +231,11 @@
     },
     "frames": {
       "sheet": "intake/red-and-yellow-gummy-worm--2b7f09ab/frames.png",
-      "fw": 400,
-      "fh": 1190,
+      "fw": 396,
+      "fh": 727,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -248,10 +248,10 @@
     "frames": {
       "sheet": "intake/red-square--42358f95/frames.png",
       "fw": 400,
-      "fh": 1193,
+      "fh": 594,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -263,11 +263,11 @@
     },
     "frames": {
       "sheet": "intake/red-wood-square-earring--91a55eb9/frames.png",
-      "fw": 400,
-      "fh": 1194,
+      "fw": 397,
+      "fh": 574,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -280,10 +280,10 @@
     "frames": {
       "sheet": "intake/yellow-gummy-bear--f425dee0/frames.png",
       "fw": 400,
-      "fh": 1193,
+      "fh": 666,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -295,11 +295,11 @@
     },
     "frames": {
       "sheet": "intake/soapy-water-earring--561d509e/frames.png",
-      "fw": 474,
-      "fh": 757,
+      "fw": 400,
+      "fh": 639,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -311,11 +311,235 @@
     },
     "frames": {
       "sheet": "intake/yellow-triangle--1bded4d0/frames.png",
-      "fw": 484,
-      "fh": 724,
+      "fw": 397,
+      "fh": 594,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 48,
+      "frameMs": 33
+    }
+  },
+  "blue-chandelier": {
+    "slug": "blue-chandelier",
+    "node": 39,
+    "colors": {
+      "accent": "bluie"
+    },
+    "frames": {
+      "sheet": "intake/blue-chandelier--8ad71616/frames.png",
+      "fw": 394,
+      "fh": 521,
+      "cols": 8,
+      "rows": 6,
+      "count": 48,
+      "frameMs": 33
+    }
+  },
+  "blue-flower-cluster": {
+    "slug": "blue-flower-cluster",
+    "node": 40,
+    "colors": {
+      "accent": "bluie"
+    },
+    "frames": {
+      "sheet": "intake/blue-flower-cluster--6228248d/frames.png",
+      "fw": 400,
+      "fh": 928,
+      "cols": 7,
+      "rows": 1,
+      "count": 7,
+      "frameMs": 33
+    }
+  },
+  "pink-flower-cluster": {
+    "slug": "pink-flower-cluster",
+    "node": 41,
+    "colors": {
+      "accent": "purple"
+    },
+    "frames": {
+      "sheet": "intake/pink-flower-cluster--9ab936f5/frames.png",
+      "fw": 396,
+      "fh": 725,
+      "cols": 7,
+      "rows": 1,
+      "count": 7,
+      "frameMs": 33
+    }
+  },
+  "green-lollipop-cluster": {
+    "slug": "green-lollipop-cluster",
+    "node": 42,
+    "colors": {
+      "accent": "green"
+    },
+    "frames": {
+      "sheet": "intake/green-lollipop-cluster--dbdbc7f4/frames.png",
+      "fw": 400,
+      "fh": 1255,
+      "cols": 7,
+      "rows": 1,
+      "count": 7,
+      "frameMs": 33
+    }
+  },
+  "clear-star-drop": {
+    "slug": "clear-star-drop",
+    "node": 43,
+    "colors": {
+      "accent": "bluie"
+    },
+    "frames": {
+      "sheet": "intake/clear-star-drop--63602439/frames.png",
+      "fw": 396,
+      "fh": 646,
+      "cols": 7,
+      "rows": 1,
+      "count": 7,
+      "frameMs": 33
+    }
+  },
+  "twin-screwpops": {
+    "slug": "twin-screwpops",
+    "node": 44,
+    "colors": {
+      "accent": "red"
+    },
+    "frames": {
+      "sheet": "intake/twin-screwpops--f13eeb50/frames.png",
+      "fw": 394,
+      "fh": 451,
+      "cols": 7,
+      "rows": 1,
+      "count": 7,
+      "frameMs": 33
+    }
+  },
+  "blue-raspberry-sugar-coated-meds": {
+    "slug": "blue-raspberry-sugar-coated-meds",
+    "node": 45,
+    "colors": {
+      "accent": "bluie"
+    },
+    "frames": {
+      "sheet": "intake/blue-raspberry-sugar-coated-meds--dbd62bd4/frames.png",
+      "fw": 400,
+      "fh": 433,
+      "cols": 8,
+      "rows": 6,
+      "count": 43,
+      "frameMs": 33
+    }
+  },
+  "bubblegum-sugar-coated-meds": {
+    "slug": "bubblegum-sugar-coated-meds",
+    "node": 46,
+    "colors": {
+      "accent": "purple"
+    },
+    "frames": {
+      "sheet": "intake/bubblegum-sugar-coated-meds--896823cf/frames.png",
+      "fw": 396,
+      "fh": 569,
+      "cols": 8,
+      "rows": 6,
+      "count": 48,
+      "frameMs": 33
+    }
+  },
+  "cherry-sugar-coated-meds": {
+    "slug": "cherry-sugar-coated-meds",
+    "node": 47,
+    "colors": {
+      "accent": "red"
+    },
+    "frames": {
+      "sheet": "intake/cherry-sugar-coated-meds--b7c2c8b3/frames.png",
+      "fw": 396,
+      "fh": 775,
+      "cols": 7,
+      "rows": 1,
+      "count": 7,
+      "frameMs": 33
+    }
+  },
+  "grape-sugar-coated-meds": {
+    "slug": "grape-sugar-coated-meds",
+    "node": 48,
+    "colors": {
+      "accent": "purple"
+    },
+    "frames": {
+      "sheet": "intake/grape-sugar-coated-meds--913e4602/frames.png",
+      "fw": 400,
+      "fh": 342,
+      "cols": 8,
+      "rows": 6,
+      "count": 48,
+      "frameMs": 33
+    }
+  },
+  "lemon-sugar-coated-meds": {
+    "slug": "lemon-sugar-coated-meds",
+    "node": 49,
+    "colors": {
+      "accent": "yellow"
+    },
+    "frames": {
+      "sheet": "intake/lemon-sugar-coated-meds--fe6a6c57/frames.png",
+      "fw": 396,
+      "fh": 710,
+      "cols": 7,
+      "rows": 1,
+      "count": 7,
+      "frameMs": 33
+    }
+  },
+  "green-drop": {
+    "slug": "green-drop",
+    "node": 50,
+    "colors": {
+      "accent": "green"
+    },
+    "frames": {
+      "sheet": "intake/green-drop--2f330ab0/frames.png",
+      "fw": 396,
+      "fh": 711,
+      "cols": 7,
+      "rows": 1,
+      "count": 7,
+      "frameMs": 33
+    }
+  },
+  "pan-earring": {
+    "slug": "pan-earring",
+    "node": 51,
+    "colors": {
+      "accent": "yellow"
+    },
+    "frames": {
+      "sheet": "intake/pan-earring--0441db8f/frames.png",
+      "fw": 394,
+      "fh": 515,
+      "cols": 6,
+      "rows": 1,
+      "count": 6,
+      "frameMs": 33
+    }
+  },
+  "yellow-wood-triangle": {
+    "slug": "yellow-wood-triangle",
+    "node": 52,
+    "colors": {
+      "accent": "yellow"
+    },
+    "frames": {
+      "sheet": "intake/yellow-wood-triangle--48536da3/frames.png",
+      "fw": 400,
+      "fh": 613,
+      "cols": 8,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   }
