@@ -724,10 +724,10 @@ body.has-selection.is-selling-open .shop-panel {
 .layout-placed {
   position: absolute;
   width: 44px;
-  height: 44px;
-  object-fit: cover;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
+  height: auto;
+  border-radius: 0.4rem;
+  /* hang below the node like the real board: top edge at the wire */
+  transform: translate(-50%, -10%);
   cursor: grab;
   box-shadow: 0 2px 6px rgb(0 0 0 / 25%);
   touch-action: none;
@@ -793,10 +793,9 @@ body.has-selection.is-selling-open .shop-panel {
 .layout-picker-row:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
 
 .layout-picker-row img {
-  width: 34px;
-  height: 34px;
-  object-fit: cover;
-  border-radius: 50%;
+  width: 26px;
+  height: auto;
+  border-radius: 0.3rem;
 }
 
 .layout-picker-empty { font-size: 0.8rem; margin: 0.3rem; }
@@ -817,6 +816,9 @@ body.has-selection.is-selling-open .shop-panel {
 .studio-card h2 { font-size: 1.1rem; }
 .studio-thumb { width: 20%; aspect-ratio: 1; object-fit: cover; border-radius: 0.75rem; }
 .studio-thumb[hidden] { display: none; }
+.studio-previews { display: flex; align-items: flex-start; gap: 0.75rem; }
+.studio-frame-preview { width: 20%; border-radius: 0.75rem; }
+.studio-frame-preview[hidden] { display: none; }
 .studio-detail, .studio-held { font-size: 0.78rem; line-height: 1.4; opacity: 0.75; }
 .studio-card label { display: grid; gap: 0.35rem; font-size: 0.78rem; font-weight: 600; }
 .studio-card input[type="number"], .studio-card select {

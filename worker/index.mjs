@@ -250,7 +250,7 @@ export class InventoryLock {
       // the unit unavailable without it having been sold yet.
       const available = listing.quantity - (reservedByProduct.get(product.id) || 0);
       if (available < 1) continue;
-      listings.push({ ...details, quantity: available, graphicKey: listing.graphicKey, sizePercent: listing.sizePercent || 100 });
+      listings.push({ ...details, quantity: available, graphicKey: listing.graphicKey, sizePercent: listing.sizePercent || 100, frameOffset: listing.frameOffset || 0 });
     }
     return json({ listings }, 200, { 'cache-control': 'no-store' });
   }
@@ -281,6 +281,7 @@ export class InventoryLock {
         published: listing?.published || false,
         graphicKey: listing?.graphicKey || '',
         sizePercent: listing?.sizePercent || 100,
+        frameOffset: listing?.frameOffset || 0,
       });
     }
     return json({ listings });
@@ -294,18 +295,25 @@ export class InventoryLock {
     // sizePercent is Jesse's per-listing display-size hone: 5% steps the
     // Studio stepper applies around the board's base scale. Default 100.
     const rawSize = input?.sizePercent === undefined ? 100 : Number(input?.sizePercent);
+    // frameOffset is Jesse's per-listing rest-frame hone: sheets hang each
+    // earring at a different rotation, so the Studio stepper picks which
+    // sheet frame the board rests on. Default 0 (frame 1).
+    const rawFrame = input?.frameOffset === undefined ? 0 : Number(input?.frameOffset);
     if (!Number.isSafeInteger(quantity) || quantity < 0 || typeof published !== 'boolean' || !graphicKey) {
       throw new HttpError(400, 'Stock, graphic, and publish status are required.');
     }
     if (!Number.isSafeInteger(rawSize) || rawSize < 50 || rawSize > 200 || rawSize % 5 !== 0) {
       throw new HttpError(400, 'Size must be a multiple of 5 between 50% and 200%.');
     }
+    if (!Number.isSafeInteger(rawFrame) || rawFrame < 0 || rawFrame > 999) {
+      throw new HttpError(400, 'Straight-on frame must be a frame number between 1 and 1000.');
+    }
     // No Stripe round-trip here on purpose: a save must be a deterministic
     // local write. A transient Stripe failure used to fail the whole save,
     // which read as "the studio update is finicky". Listings only surface
     // through studioListings for Products Stripe actually returns, so a
     // phantom productId is inert.
-    const listing = { productId, quantity, published, graphicKey, sizePercent: rawSize };
+    const listing = { productId, quantity, published, graphicKey, sizePercent: rawSize, frameOffset: rawFrame };
     await this.state.storage.put(this.listingKey(productId), listing);
     return json({ listing });
   }

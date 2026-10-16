@@ -4,6 +4,7 @@ window.Studio = (() => {
   const status = document.querySelector('.studio-status');
   const list = document.querySelector('.studio-list');
   const graphics = window.EARRING_VISUALS || {};
+  const sheetCache = new Map();
 
   const setStatus = (message, isError = false) => {
     status.textContent = message;
@@ -17,6 +18,37 @@ window.Studio = (() => {
     node.selected = value === selected;
     return node;
   };
+
+  // Draws one sheet frame (the straight-on preview) into a canvas the card
+  // shows next to the Stripe image, so Jesse can see exactly which frame
+  // each offset value means before saving. Sheet paths in entries.js resolve
+  // against the site root; the studio page lives one level down.
+  function drawFramePreview(visual, offset, canvas) {
+    const frames = visual?.frames;
+    if (!frames) {
+      canvas.hidden = true;
+      return;
+    }
+    canvas.hidden = false;
+    const url = new URL(`../${frames.sheet}`, document.location.href).href;
+    let image = sheetCache.get(url);
+    if (!image) {
+      image = new Image();
+      image.src = url;
+      sheetCache.set(url, image);
+    }
+    const paint = () => {
+      const width = canvas.width;
+      const height = Math.round(width * frames.fh / frames.fw);
+      canvas.height = height;
+      const index = ((offset % frames.count) + frames.count) % frames.count;
+      canvas.getContext('2d').drawImage(image,
+        (index % frames.cols) * frames.fw, Math.floor(index / frames.cols) * frames.fh,
+        frames.fw, frames.fh, 0, 0, width, height);
+    };
+    if (image.complete && image.naturalWidth) paint();
+    else image.addEventListener('load', paint, { once: true });
+  }
 
   function cardFor(listing) {
     const card = document.createElement('article');
@@ -76,6 +108,42 @@ window.Studio = (() => {
     sizeRow.append(sizeButton(-5), sizeReadout, sizeButton(5));
     sizeLabel.append(sizeRow);
 
+    // Straight-on frame: which sheet frame the earring rests on when it is
+    // not spinning. Sheets hang each earring at a different rotation, so
+    // Jesse offsets the rest frame per earring the same way size is honed.
+    // The preview canvas always shows the current graphic's frame 1 with the
+    // offset applied — the exact frame the public board rests on.
+    const framePreview = document.createElement('canvas');
+    framePreview.className = 'studio-frame-preview';
+    framePreview.width = 96;
+    let frameOffset = listing.frameOffset || 0;
+    const framesFor = () => graphics[graphic.value]?.frames || null;
+    const frameLabel = document.createElement('label');
+    frameLabel.textContent = 'straight-on frame';
+    const frameRow = document.createElement('div');
+    frameRow.className = 'studio-size';
+    const frameReadout = document.createElement('span');
+    const syncFrame = () => {
+      const count = framesFor()?.count || 1;
+      const shown = ((frameOffset % count) + count) % count;
+      frameReadout.textContent = `${shown + 1}/${count}`;
+      drawFramePreview(graphics[graphic.value], shown, framePreview);
+    };
+    const frameButton = (delta) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = delta > 0 ? '+1' : '−1';
+      button.addEventListener('click', () => {
+        frameOffset = Math.max(0, frameOffset + delta);
+        syncFrame();
+      });
+      return button;
+    };
+    frameRow.append(frameButton(-1), frameReadout, frameButton(1));
+    frameLabel.append(frameRow);
+    graphic.addEventListener('change', syncFrame);
+    syncFrame();
+
     const publishLabel = document.createElement('label');
     publishLabel.className = 'studio-check';
     const published = document.createElement('input');
@@ -108,6 +176,7 @@ window.Studio = (() => {
             graphicKey: graphic.value,
             published: published.checked,
             sizePercent,
+            frameOffset,
           }),
         });
         const result = await response.json().catch(() => ({}));
@@ -123,7 +192,12 @@ window.Studio = (() => {
       }
     });
 
-    card.append(heading, thumb, detail, stockLabel, graphicLabel, sizeLabel, publishLabel, held, save);
+    const previewRow = document.createElement('div');
+    previewRow.className = 'studio-previews';
+    previewRow.append(thumb, framePreview);
+
+    card.append(heading, previewRow, detail, stockLabel, graphicLabel, sizeLabel,
+      frameLabel, publishLabel, held, save);
     return card;
   }
 

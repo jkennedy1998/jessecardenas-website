@@ -620,7 +620,11 @@ async function initEarringsPage() {
         const jellyState = window.Dangle.createJelly(dangle, {
           // Base scale is tuned down for the high-res intake sheets; each
           // listing's Studio sizePercent (5% steps) hones it from here.
-          node: entry.node, frames, scale: BOARD_BASE_SCALE * ((entry.sizePercent || 100) / 100), length: 140,
+          // frameOffset is the listing's straight-on frame — the sheet frame
+          // the earring rests on when it is not spinning.
+          node: entry.node, frames,
+          scale: BOARD_BASE_SCALE * ((entry.sizePercent || 100) / 100), length: 140,
+          frameOffset: entry.frameOffset || 0,
           accentColor: paletteFor(entry.colors?.accent).dark,
           onSelect: () => window.Shop.toggle(entry),
           onHover: (state) => {

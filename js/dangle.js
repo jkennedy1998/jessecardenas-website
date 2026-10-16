@@ -296,6 +296,10 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
 
   function createJelly(dangle, {
     node = 1, frames, scale = 0.7, length = 140, accentColor = "#261231", onSelect, onHover,
+    // straight-on frame: which sheet frame the earring rests on when not
+    // spinning — sheets hang each earring at a different rotation, so the
+    // Studio per-listing offset shifts the whole dial mapping
+    frameOffset = 0,
     // showcase embeds: fixed hang point, no board drop/grate shadow, and
     // optional stroke — everything else (dial, swing, corners, breeze) is
     // the same physics the board runs
@@ -365,8 +369,9 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       shadow: shadowCanvas, shadowCtx: shadowCanvas ? shadowCanvas.getContext("2d") : null,
       fw: frames.fw, fh: frames.fh, cols: frames.cols, count: frames.count,
       fps: 1000 / (frames.frameMs || 40),
+      frameOffset,
       // dial state: angle (rad, unbounded) maps onto the sequence —
-      // frameF = angle/TAU * count, looping on 0 and last
+      // frameF = angle/TAU * count + offset, looping on 0 and last
       angle: 0, dialVel: 0, prevDialVel: 0,
       // pivot swing: the png rotates around its top-center (the hook)
       swing: 0, swingVel: 0,
@@ -563,8 +568,11 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       // its canvas planar so rotating a pendant never rotates that grid mask.
       if (state.shadow) state.shadow.style.transform = "none";
 
-      // sequence percentage == angle percentage: one turn = the whole loop
-      state.frameF = (((state.angle / TAU) * state.count) % state.count + state.count) % state.count;
+      // sequence percentage == angle percentage: one turn = the whole loop.
+      // frameOffset shifts the mapping so the rest frame (angle 0) is the
+      // listing's straight-on frame instead of frame 1.
+      state.frameF = (((state.angle / TAU) * state.count + state.frameOffset)
+        % state.count + state.count) % state.count;
 
       // Stroke width has its own quick physical ease, while its color takes a
       // visible 0.6s cubic ease-out: immediate movement, gentle final settle.

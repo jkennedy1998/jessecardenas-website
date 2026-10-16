@@ -35,6 +35,8 @@
   - local cutout-sequence importer.
 - `split-earring-asset.py`
   - legacy two-piece earring asset helper.
+- `compress-sheets.py`
+  - one-shot compression pass: quantizes every intake frames.png to a dithered 256-color palette PNG (~174MB -> ~38MB); intake sheets regenerate from the raw MOVs so the in-place rewrite is safe.
 - `truth.md`
   - durable J design decisions for this boundary.
 

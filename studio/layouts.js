@@ -1,11 +1,13 @@
-// Board layout authoring for Catalog Studio. Lives below the listings
+// Board layout authoring for Catalog Studio. Lives above the listings
 // section on the same page. Jesse picks a layout (dots), drags catalog
 // earrings onto the grate replica, and saves. Dragging a placed earring off
 // the board removes it from the layout. The picker only offers earrings with
 // availability >= 1 — the same visibility rule as the public board — and
-// shows the Stripe-derived PNG thumbnails. Grid math (nodePoint /
-// nearestNode) is reused from js/dangle.js so the editor and the public
-// board can never disagree about where nodes are.
+// shows the same sprite-sheet graphics the public board renders (the rest
+// frame of each earring's sheet, scaled down), so what Jesse places is what
+// shoppers see. Grid math (nodePoint / nearestNode) is reused from
+// js/dangle.js so the editor and the public board can never disagree about
+// where nodes are.
 window.StudioLayouts = (() => {
   const root = document.querySelector(".layout-editor");
   if (!root) return null;
@@ -18,7 +20,8 @@ window.StudioLayouts = (() => {
   const pickerPanel = root.querySelector(".layout-picker-panel");
   const saveButton = root.querySelector(".layout-save");
 
-  const NODE_PX = 44; // placed earring thumbnail size, CSS px
+  const NODE_PX = 44; // placed earring thumbnail width, CSS px (height follows the frame aspect)
+  const visuals = window.EARRING_VISUALS || {};
   let listings = []; // studio listings from the Worker
   let layouts = []; // saved layouts, ordered
   let buffer = null; // { id, name, items: [{ productId, node }] }
@@ -28,6 +31,58 @@ window.StudioLayouts = (() => {
     statusEl.textContent = message;
     statusEl.dataset.error = isError ? "true" : "false";
   };
+
+  // Sprite-sheet frame thumbnails: draw the listing's rest frame (frame 1
+  // plus its Studio straight-on offset) out of the same sheet the public
+  // board renders, scaled to the editor size. Cached per graphic+offset so
+  // re-renders never re-decode the sheet; falls back to the Stripe image
+  // while the sheet loads or when no graphic is mapped.
+  const sheetCache = new Map();
+  const frameThumbCache = new Map();
+  function sheetFor(visual) {
+    const url = new URL(`../${visual.frames.sheet}`, document.location.href).href;
+    let sheet = sheetCache.get(url);
+    if (!sheet) {
+      sheet = new Image();
+      sheet.src = url;
+      sheetCache.set(url, sheet);
+    }
+    return sheet;
+  }
+
+  function drawFrameThumb(listing, done) {
+    const visual = visuals[listing.graphicKey];
+    if (!visual?.frames) return false;
+    const { sheet, fw, fh, cols, count } = visual.frames;
+    const offset = ((listing.frameOffset || 0) % count + count) % count;
+    const cacheKey = `${listing.graphicKey}:${offset}`;
+    if (frameThumbCache.has(cacheKey)) {
+      done(frameThumbCache.get(cacheKey));
+      return true;
+    }
+    const image = sheetFor(visual);
+    const paint = () => {
+      const canvas = document.createElement("canvas");
+      const width = NODE_PX * 2; // 2x for sharp rendering on hidpi screens
+      const height = Math.round(width * fh / fw);
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(image,
+        (offset % cols) * fw, Math.floor(offset / cols) * fh, fw, fh,
+        0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/png");
+      frameThumbCache.set(cacheKey, dataUrl);
+      done(dataUrl);
+    };
+    if (image.complete && image.naturalWidth) paint();
+    else image.addEventListener("load", paint, { once: true });
+    return true;
+  }
+
+  function setThumb(img, listing) {
+    if (listing.image) img.src = listing.image;
+    drawFrameThumb(listing, (dataUrl) => { img.src = dataUrl; });
+  }
 
   const availableListings = () => listings.filter((listing) => listing.available >= 1);
   const listingFor = (productId) => listings.find((listing) => listing.productId === productId);
@@ -122,6 +177,7 @@ window.StudioLayouts = (() => {
       const img = document.createElement("img");
       img.className = "layout-placed";
       if (listing?.image) img.src = listing.image;
+      drawFrameThumb(listing, (dataUrl) => { img.src = dataUrl; });
       img.alt = listing?.title || item.productId;
       img.title = listing?.title || item.productId;
       img.draggable = false;
@@ -173,7 +229,7 @@ window.StudioLayouts = (() => {
     if (!options.length) {
       const empty = document.createElement("p");
       empty.className = "layout-picker-empty";
-      empty.textContent = "no earrings with stock — add stock in the listings above.";
+      empty.textContent = "no earrings with stock — add stock in the listings below.";
       pickerPanel.append(empty);
     }
     for (const listing of options) {
@@ -182,6 +238,7 @@ window.StudioLayouts = (() => {
       row.className = "layout-picker-row";
       const thumb = document.createElement("img");
       if (listing.image) thumb.src = listing.image;
+      drawFrameThumb(listing, (dataUrl) => { thumb.src = dataUrl; });
       thumb.alt = "";
       const label = document.createElement("span");
       label.textContent = listing.title;

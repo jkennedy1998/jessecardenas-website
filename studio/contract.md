@@ -17,9 +17,11 @@
 
 ## contents
 - `index.html`
-  - private Catalog Studio page shell.
+  - private Catalog Studio page shell: board-layout organizer on top, Stripe listing forms below.
 - `studio.js`
-  - Studio listing form, graphic picker, and Worker API client.
+  - Studio listing form (stock, graphic, size, straight-on frame, publish), frame preview canvas, and Worker API client.
+- `layouts.js`
+  - board layout authoring: layout dots, grate replica drag editing, and the sprite-sheet-frame picker/placed thumbnails.
 - `contract.md`
   - this boundary contract.
 
