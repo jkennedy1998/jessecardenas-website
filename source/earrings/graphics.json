@@ -214,12 +214,12 @@
       "accent": "violet"
     },
     "frames": {
-      "sheet": "intake/rainbow-chandelier--b5d9235a/frames.png",
-      "fw": 400,
-      "fh": 821,
+      "sheet": "intake/rainbow-chandelier--519be110/frames.png",
+      "fw": 398,
+      "fh": 790,
       "cols": 8,
-      "rows": 3,
-      "count": 24,
+      "rows": 6,
+      "count": 45,
       "frameMs": 33
     }
   },
@@ -342,12 +342,12 @@
       "accent": "bluie"
     },
     "frames": {
-      "sheet": "intake/blue-flower-cluster--6228248d/frames.png",
-      "fw": 400,
-      "fh": 928,
-      "cols": 7,
-      "rows": 1,
-      "count": 7,
+      "sheet": "intake/blue-flower-cluster--a9f80ded/frames.png",
+      "fw": 230,
+      "fh": 586,
+      "cols": 8,
+      "rows": 6,
+      "count": 45,
       "frameMs": 33
     }
   },
@@ -358,12 +358,12 @@
       "accent": "purple"
     },
     "frames": {
-      "sheet": "intake/pink-flower-cluster--9ab936f5/frames.png",
-      "fw": 396,
-      "fh": 725,
-      "cols": 7,
-      "rows": 1,
-      "count": 7,
+      "sheet": "intake/pink-flower-cluster--b7be6014/frames.png",
+      "fw": 274,
+      "fh": 628,
+      "cols": 8,
+      "rows": 6,
+      "count": 44,
       "frameMs": 33
     }
   },
@@ -374,12 +374,12 @@
       "accent": "green"
     },
     "frames": {
-      "sheet": "intake/green-lollipop-cluster--dbdbc7f4/frames.png",
-      "fw": 400,
-      "fh": 1255,
-      "cols": 7,
-      "rows": 1,
-      "count": 7,
+      "sheet": "intake/green-lollipop-cluster--d1b5c1ad/frames.png",
+      "fw": 359,
+      "fh": 688,
+      "cols": 8,
+      "rows": 6,
+      "count": 45,
       "frameMs": 33
     }
   },
@@ -390,12 +390,12 @@
       "accent": "bluie"
     },
     "frames": {
-      "sheet": "intake/clear-star-drop--63602439/frames.png",
-      "fw": 396,
-      "fh": 646,
-      "cols": 7,
-      "rows": 1,
-      "count": 7,
+      "sheet": "intake/clear-star-drop--70dd4f9c/frames.png",
+      "fw": 240,
+      "fh": 722,
+      "cols": 8,
+      "rows": 6,
+      "count": 47,
       "frameMs": 33
     }
   },
@@ -406,12 +406,12 @@
       "accent": "red"
     },
     "frames": {
-      "sheet": "intake/twin-screwpops--f13eeb50/frames.png",
-      "fw": 394,
-      "fh": 451,
-      "cols": 7,
-      "rows": 1,
-      "count": 7,
+      "sheet": "intake/twin-screwpops--b9e39706/frames.png",
+      "fw": 386,
+      "fh": 572,
+      "cols": 8,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -454,12 +454,12 @@
       "accent": "red"
     },
     "frames": {
-      "sheet": "intake/cherry-sugar-coated-meds--b7c2c8b3/frames.png",
-      "fw": 396,
-      "fh": 775,
-      "cols": 7,
-      "rows": 1,
-      "count": 7,
+      "sheet": "intake/cherry-sugar-coated-meds--3bdbde50/frames.png",
+      "fw": 328,
+      "fh": 733,
+      "cols": 8,
+      "rows": 6,
+      "count": 45,
       "frameMs": 33
     }
   },
@@ -486,12 +486,12 @@
       "accent": "yellow"
     },
     "frames": {
-      "sheet": "intake/lemon-sugar-coated-meds--fe6a6c57/frames.png",
-      "fw": 396,
-      "fh": 710,
-      "cols": 7,
-      "rows": 1,
-      "count": 7,
+      "sheet": "intake/lemon-sugar-coated-meds--d5d484a4/frames.png",
+      "fw": 272,
+      "fh": 314,
+      "cols": 8,
+      "rows": 6,
+      "count": 45,
       "frameMs": 33
     }
   },
@@ -502,12 +502,12 @@
       "accent": "green"
     },
     "frames": {
-      "sheet": "intake/green-drop--2f330ab0/frames.png",
-      "fw": 396,
-      "fh": 711,
-      "cols": 7,
-      "rows": 1,
-      "count": 7,
+      "sheet": "intake/green-drop--630f776a/frames.png",
+      "fw": 394,
+      "fh": 742,
+      "cols": 8,
+      "rows": 6,
+      "count": 48,
       "frameMs": 33
     }
   },
@@ -518,12 +518,12 @@
       "accent": "yellow"
     },
     "frames": {
-      "sheet": "intake/pan-earring--0441db8f/frames.png",
-      "fw": 394,
-      "fh": 515,
-      "cols": 6,
-      "rows": 1,
-      "count": 6,
+      "sheet": "intake/pan-earring--5f1b16a9/frames.png",
+      "fw": 384,
+      "fh": 660,
+      "cols": 8,
+      "rows": 6,
+      "count": 44,
       "frameMs": 33
     }
   },
