@@ -162,7 +162,17 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
   // with almost no travel is a click (select); a fast horizontal release with
   // little net travel is a flick (spin in place); anything else is a move.
   function attachDrag(state, grabber, releaseExtra) {
+    const isTouchLayout = () => window.matchMedia("(max-width: 900px)").matches;
     grabber.addEventListener("pointerdown", (event) => {
+      // On the compact layout, an earring is a simple tap target. Drag and
+      // flick are desktop affordances; preserving them on touch made it too
+      // easy to move an item accidentally while trying to read about it.
+      if (isTouchLayout()) {
+        state.mobileTap = { x: event.clientX, y: event.clientY };
+        grabber.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        return;
+      }
       state.dragging = true;
       state.dragMoved = 0;
       state.dragStart = { x: event.clientX, y: event.clientY, t: performance.now() };
@@ -175,6 +185,10 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     });
 
     grabber.addEventListener("pointermove", (event) => {
+      if (state.mobileTap) {
+        event.preventDefault();
+        return;
+      }
       if (!state.dragging || !state.pointer) return;
       const now = performance.now();
       const dt = Math.max((now - state.pointer.t) / 1000, 1 / 240);
@@ -200,6 +214,13 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     const release = (event) => {
       if (grabber.hasPointerCapture && grabber.hasPointerCapture(event.pointerId)) {
         grabber.releasePointerCapture(event.pointerId);
+      }
+      if (state.mobileTap) {
+        const travel = Math.abs(event.clientX - state.mobileTap.x) +
+          Math.abs(event.clientY - state.mobileTap.y);
+        state.mobileTap = null;
+        if (event.type === "pointerup" && travel < CLICK_PX && state.onSelect) state.onSelect();
+        return;
       }
       state.dragging = false;
       state.pointer = null;
