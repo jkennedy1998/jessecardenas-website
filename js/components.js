@@ -233,76 +233,6 @@ function buildEarringHoverCard(stage) {
   };
 }
 
-// Compact screens deliberately use an explicit, dismissible detail sheet
-// instead of the desktop hover card. A tap means "tell me about this"; adding
-// it to the basket is a separate, visible action, so the board never leaves a
-// stray text box over the item the person is trying to inspect.
-function buildMobileListingSheet(stage) {
-  const sheet = document.createElement("aside");
-  sheet.className = "mobile-listing-sheet";
-  sheet.setAttribute("aria-hidden", "true");
-  sheet.setAttribute("aria-label", "earring details");
-
-  const close = document.createElement("button");
-  close.type = "button";
-  close.className = "mobile-listing-close";
-  close.setAttribute("aria-label", "close details");
-  close.textContent = "×";
-  const title = document.createElement("h2");
-  const materials = document.createElement("p");
-  materials.className = "mobile-listing-materials";
-  const description = document.createElement("p");
-  description.className = "mobile-listing-description";
-  const price = document.createElement("p");
-  price.className = "mobile-listing-price";
-  const actions = document.createElement("div");
-  actions.className = "mobile-listing-actions";
-  const single = document.createElement("button");
-  single.type = "button";
-  single.textContent = "add single";
-  const pair = document.createElement("button");
-  pair.type = "button";
-  pair.textContent = "add pair";
-  actions.append(single, pair);
-  sheet.append(close, title, materials, description, price, actions);
-  stage.append(sheet);
-
-  let activeEntry = null;
-  const hide = () => {
-    activeEntry = null;
-    sheet.classList.remove("is-open");
-    sheet.setAttribute("aria-hidden", "true");
-  };
-  close.addEventListener("click", hide);
-  sheet.addEventListener("click", (event) => {
-    if (event.target === sheet) hide();
-  });
-  const add = (mode) => {
-    if (!activeEntry) return;
-    window.Shop.select(activeEntry, mode);
-    hide();
-  };
-  single.addEventListener("click", () => add("single"));
-  pair.addEventListener("click", () => add("pair"));
-
-  return {
-    show(entry) {
-      activeEntry = entry;
-      title.textContent = entry.title || entry.slug;
-      materials.textContent = entry.materials || "";
-      materials.hidden = !entry.materials;
-      description.textContent = entry.description || "";
-      description.hidden = !entry.description;
-      price.textContent = `$${entry.price} single · $${entry.price * 2} pair`;
-      single.disabled = (entry.quantity || 0) < 1;
-      pair.disabled = (entry.quantity || 0) < 2;
-      sheet.classList.add("is-open");
-      sheet.setAttribute("aria-hidden", "false");
-    },
-    hide,
-  };
-}
-
 function buildEarringHang(entry, nodeIndex) {
   const dangle = document.createElement("div");
   dangle.className = "earring-dangle";
@@ -647,8 +577,8 @@ async function initEarringsPage() {
   let activeIndex = 0;
   let activeJellies = [];
   let hoverCard = null;
-  const mobileListingSheet = buildMobileListingSheet(stage);
   const isCompactLayout = () => window.matchMedia("(max-width: 900px)").matches;
+  let lastSelectedProductId = null;
   let switching = false;
 
   const byProduct = () => new Map(entries.map((entry) => [entry.productId, entry]));
@@ -699,12 +629,19 @@ async function initEarringsPage() {
           frameOffset: entry.frameOffset || 0,
           accentColor: paletteFor(entry.colors?.accent).dark,
           onSelect: () => {
-            if (isCompactLayout()) mobileListingSheet.show(entry);
-            else window.Shop.toggle(entry);
+            if (isCompactLayout()) {
+              // A tap changes cart truth directly. The most recently added
+              // item becomes the one enlarged on the board; tapping it again
+              // removes it, and the latest remaining pick takes focus.
+              if (window.Shop.has(entry.productId)) {
+                if (lastSelectedProductId === entry.productId) lastSelectedProductId = null;
+              } else {
+                lastSelectedProductId = entry.productId;
+              }
+            }
+            window.Shop.toggle(entry);
           },
           onHover: (state) => {
-            // Desktop keeps the live hover-card interaction. Compact layouts
-            // have no hover state; their tap opens the explicit detail sheet.
             if (isCompactLayout()) return;
             if (state) hoverCard?.show(entry, state);
             else hoverCard?.hide();
@@ -813,14 +750,22 @@ async function initEarringsPage() {
   }
 
   function syncSelection() {
+    const selected = window.Shop.summary().list;
+    const selectedIds = new Set(selected.map((item) => item.productId));
+    if (!selectedIds.has(lastSelectedProductId)) {
+      lastSelectedProductId = selected.at(-1)?.productId || null;
+    }
+    const focusedProductId = isCompactLayout() ? lastSelectedProductId : null;
     setActiveColor(entries);
     for (const { entry, state } of activeJellies) {
-      state.setSelected(window.Shop.has(entry.productId));
+      state.setSelected(selectedIds.has(entry.productId));
+      state.setMobileFocused?.(entry.productId === focusedProductId);
     }
   }
 
   mountLayout(layouts[0]);
   renderDots();
+  window.addEventListener("resize", syncSelection);
 
   const panel = document.querySelector(".shop-panel");
   if (panel) buildShopPanel(panel);

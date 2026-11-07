@@ -73,6 +73,8 @@ const DIAL_V_MAX = 15; // rad/s, dial velocity cap
 const HOVER_KICK = 9; // rad/s, wiggle impulse on hover
 const PICKUP_KICK = 14; // rad/s, bigger wiggle impulse on pickup
 const CLICK_PX = 6; // pointer travel below which a press is a click (select)
+const MOBILE_ROTATE_HOLD_MS = 160; // avoids confusing a selection tap with a turn
+const MOBILE_ROTATE_START_PX = 8;
 const FLICK_TRAVEL_PX = 48; // max travel for a release to read as a flick-spin
 const FLICK_SPEED = 900; // px/s horizontal release speed to trigger a flick
 // Pivot swing: the png itself rotates around its top-center point (where the
@@ -164,11 +166,16 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
   function attachDrag(state, grabber, releaseExtra) {
     const isTouchLayout = () => window.matchMedia("(max-width: 900px)").matches;
     grabber.addEventListener("pointerdown", (event) => {
-      // On the compact layout, an earring is a simple tap target. Drag and
-      // flick are desktop affordances; preserving them on touch made it too
-      // easy to move an item accidentally while trying to read about it.
+      // Compact layout: taps toggle this earring in the cart. A selected
+      // earring may instead be held and swiped horizontally to turn it; touch
+      // never moves its position on the grate.
       if (isTouchLayout()) {
-        state.mobileTap = { x: event.clientX, y: event.clientY };
+        const now = performance.now();
+        state.mobileGesture = {
+          x: event.clientX, y: event.clientY, t: now,
+          lastX: event.clientX, lastT: now,
+          selected: state.selected, rotating: false,
+        };
         grabber.setPointerCapture(event.pointerId);
         event.preventDefault();
         return;
@@ -185,7 +192,24 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     });
 
     grabber.addEventListener("pointermove", (event) => {
-      if (state.mobileTap) {
+      if (state.mobileGesture) {
+        const gesture = state.mobileGesture;
+        const now = performance.now();
+        const travel = Math.abs(event.clientX - gesture.x) + Math.abs(event.clientY - gesture.y);
+        if (gesture.selected && !gesture.rotating &&
+          now - gesture.t >= MOBILE_ROTATE_HOLD_MS && travel >= MOBILE_ROTATE_START_PX) {
+          gesture.rotating = true;
+        }
+        if (gesture.rotating) {
+          const dt = Math.max((now - gesture.lastT) / 1000, 1 / 240);
+          const dx = event.clientX - gesture.lastX;
+          // The sequence dial is the visual rotation. Move it directly for a
+          // responsive touch turn, then leave a small velocity for momentum.
+          state.angle -= dx / DIAL_PX_PER_RAD;
+          state.dialVel = clamp(-(dx / dt) / DIAL_PX_PER_RAD, -DIAL_V_MAX, DIAL_V_MAX);
+        }
+        gesture.lastX = event.clientX;
+        gesture.lastT = now;
         event.preventDefault();
         return;
       }
@@ -215,11 +239,13 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       if (grabber.hasPointerCapture && grabber.hasPointerCapture(event.pointerId)) {
         grabber.releasePointerCapture(event.pointerId);
       }
-      if (state.mobileTap) {
-        const travel = Math.abs(event.clientX - state.mobileTap.x) +
-          Math.abs(event.clientY - state.mobileTap.y);
-        state.mobileTap = null;
-        if (event.type === "pointerup" && travel < CLICK_PX && state.onSelect) state.onSelect();
+      if (state.mobileGesture) {
+        const gesture = state.mobileGesture;
+        const travel = Math.abs(event.clientX - gesture.x) + Math.abs(event.clientY - gesture.y);
+        state.mobileGesture = null;
+        if (event.type === "pointerup" && !gesture.rotating && travel < CLICK_PX && state.onSelect) {
+          state.onSelect();
+        }
         return;
       }
       state.dragging = false;
@@ -249,9 +275,10 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         state.node = nearestNode(state.x, state.y);
         state.home = nodePoint(state.node);
       }
-      // Selection retains its outline only; size belongs to the hovered item.
+      // Selection retains its outline only; size belongs to the hovered or
+      // currently focused item.
       state.scaleTarget = state.baseScale *
-        (state.hovered ? (state.hoverScale || HOVER_SCALE) : 1);
+        (state.hovered || state.mobileFocused ? (state.hoverScale || HOVER_SCALE) : 1);
       state.strokeTarget = state.selected || state.hovered ? STROKE_PX : 0;
       if (releaseExtra) releaseExtra();
     };
@@ -494,8 +521,16 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       state.selected = value;
       state.strokeTarget = value || state.hovered ? STROKE_PX : 0;
       state.scaleTarget = state.baseScale *
-        (state.hovered ? HOVER_SCALE : 1);
+        (state.hovered || state.mobileFocused ? HOVER_SCALE : 1);
       state.syncStrokeColor();
+    };
+    // Cart selection and mobile visual focus are related but distinct: every
+    // selected earring keeps its outline, while only the latest selection
+    // grows to make the active choice unmistakable.
+    state.setMobileFocused = (value) => {
+      state.mobileFocused = value;
+      state.scaleTarget = state.baseScale *
+        (state.hovered || state.mobileFocused ? HOVER_SCALE : 1);
     };
     state.onSelect = () => {
       state.setSelected(!state.selected);
@@ -541,7 +576,8 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       // frame so it always comes home. While dragging the spring relaxes and
       // the dial follows the pointer's horizontal speed, so moving the piece
       // around visibly spins it through its frames.
-      const springK = state.dragging ? DIAL_K * DRAG_K_SCALE : DIAL_K;
+      const springK = state.dragging || state.mobileGesture?.rotating
+        ? DIAL_K * DRAG_K_SCALE : DIAL_K;
       state.dialVel += (-springK * Math.sin(state.angle)) * dt;
       state.dialVel -= state.dialVel * DIAL_DAMP * dt;
       state.dialVel += -(axPx / state.effLength) * Math.cos(state.angle) * dt * DIAL_KICK;

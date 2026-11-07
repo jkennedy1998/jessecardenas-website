@@ -24,21 +24,6 @@ window.Shop = (() => {
   function toggle(entry, mode = "single") {
     if (items.has(entry.productId)) {
       items.delete(entry.productId);
-      render();
-      return;
-    }
-    select(entry, mode);
-  }
-
-  // Explicit add/update used by the mobile detail sheet. Unlike toggle, this
-  // never removes an existing basket item merely because the visitor tapped
-  // its purchase control a second time.
-  function select(entry, mode = "single") {
-    const item = items.get(entry.productId);
-    if (item) {
-      item.mode = mode;
-      item.maxSingles = entry.quantity ?? item.maxSingles;
-      item.quantity = Math.max(1, Math.min(item.quantity, maxFor(item)));
     } else {
       items.set(entry.productId, {
         productId: entry.productId,
@@ -124,5 +109,5 @@ window.Shop = (() => {
 
   document.addEventListener("DOMContentLoaded", render);
 
-  return { toggle, select, remove, has, setMode, setQuantity, maxFor, lineTotal, summary, checkout };
+  return { toggle, remove, has, setMode, setQuantity, maxFor, lineTotal, summary, checkout };
 })();

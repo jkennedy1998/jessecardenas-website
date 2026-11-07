@@ -525,10 +525,8 @@ body.has-selection.is-selling-open .shop-panel {
     gap: 1rem;
   }
 
-  /* Touch gets a distinct interaction model: tap an earring for a deliberate
-     quick view, then use a real button to add it. The desktop hover card is
-     neither reachable nor useful without a pointer, so never leave it stuck
-     over the board. */
+  /* Touch has no hover card: tap toggles cart selection directly, while a
+     hold-and-swipe on the focused pick turns it without moving it. */
   .earring-hover-card { display: none; }
 
   .shop-panel {
@@ -538,66 +536,6 @@ body.has-selection.is-selling-open .shop-panel {
   }
 
   .shop-footer { padding-top: 1.25rem; }
-
-  .mobile-listing-sheet {
-    position: fixed;
-    z-index: 200;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    display: grid;
-    gap: 0.7rem;
-    padding: 1.4rem 1.25rem max(1.4rem, env(safe-area-inset-bottom));
-    background: #ffffff;
-    color: var(--site-ink);
-    border-radius: 1.5rem 1.5rem 0 0;
-    box-shadow: 0 -12px 32px rgba(38, 18, 49, 0.2);
-    transform: translateY(110%);
-    opacity: 0;
-    pointer-events: none;
-    transition: transform 0.24s cubic-bezier(0.22, 0.8, 0.24, 1), opacity 0.2s ease;
-  }
-
-  .mobile-listing-sheet.is-open {
-    transform: translateY(0);
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .mobile-listing-sheet h2,
-  .mobile-listing-sheet p { margin: 0; }
-  .mobile-listing-sheet h2 { padding-right: 2rem; font-size: 1.15rem; }
-  .mobile-listing-materials { color: var(--site-accent); font-size: 0.85rem; }
-  .mobile-listing-description { line-height: 1.4; font-size: 0.9rem; }
-  .mobile-listing-price { font-weight: 700; font-size: 0.95rem; }
-
-  .mobile-listing-close {
-    position: absolute;
-    top: 0.85rem;
-    right: 1rem;
-    width: 2rem;
-    height: 2rem;
-    border: none;
-    border-radius: 50%;
-    background: var(--site-ink);
-    color: #ffffff;
-    font: inherit;
-    font-size: 1.2rem;
-    line-height: 1;
-  }
-
-  .mobile-listing-actions { display: flex; gap: 0.7rem; }
-  .mobile-listing-actions button {
-    flex: 1;
-    min-height: 2.8rem;
-    border: none;
-    border-radius: 999px;
-    background: var(--site-ink);
-    color: #ffffff;
-    font: inherit;
-    font-weight: 600;
-  }
-  .mobile-listing-actions button:disabled { opacity: 0.38; }
 }
 
 /* contact shadow under the photo (js/dangle.js owns drawing + masking);
@@ -708,12 +646,6 @@ body.has-selection.is-selling-open .shop-panel {
   text-align: center;
   font-size: 0.8rem;
   color: var(--site-ink);
-}
-
-/* The compact listing sheet is intentionally absent on desktop: the board's
-   pointer hover card remains the desktop detail affordance. */
-@media (min-width: 901px) {
-  .mobile-listing-sheet { display: none; }
 }
 
 /* ---------- private catalog studio ---------- */
