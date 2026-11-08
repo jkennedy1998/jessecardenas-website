@@ -72,12 +72,17 @@ const DRAG_K_SCALE = 0.3; // rest-spring relax factor while dragging
 const DIAL_PX_PER_RAD = 110; // lower-half swipe: screen px per radian
 const DIAL_V_MAX = 15; // rad/s, dial velocity cap
 // A selected piece gets an occasional inviting turn after the user has left
-// it alone. Each state owns its own random cadence so a
-// cart reads like several living earrings, never a synchronized carousel.
+// it alone. Each state owns its own random cadence, so a cart reads like
+// several living earrings rather than a synchronized carousel.
 const SELECTED_IDLE_MS = 5000;
 const SELECTED_PULSE_START_JITTER = 1200;
-const SELECTED_PULSE_MIN = 7; // rad/s impulse — a clear, inviting 3D turn
-const SELECTED_PULSE_MAX = 12; // broad random range keeps each turn distinct
+// A turn is authored as a short, visible segment rather than relying only
+// on damped velocity — the preview ring otherwise clamps that first impulse
+// to ±2 frames before the full sheet arrives.
+const SELECTED_TURN_MIN_RAD = 1.25; // 20% of the sequence, clearly legible
+const SELECTED_TURN_MAX_RAD = 2.15; // 34%, varied but never a full spin
+const SELECTED_TURN_MIN_MS = 460;
+const SELECTED_TURN_MAX_MS = 780;
 const SELECTED_PULSE_GAP_MIN = 2800;
 const SELECTED_PULSE_GAP_MAX = 6200;
 const HOVER_KICK = 9; // rad/s, wiggle impulse on hover
@@ -501,6 +506,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       // Selection attraction waits for the first full-sheet canvas paint so
       // the poster-to-canvas handoff cannot cancel its opening turn.
       selectionPulsePending: false,
+      selectedTurn: null,
       // Selected turns are deferred from the most recent direct touch/drag.
       lastManualTurnAt: performance.now(), nextSelectedPulseAt: Infinity,
       // dial state: angle (rad, unbounded) maps onto the sequence —
@@ -545,15 +551,25 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         Math.random() * SELECTED_PULSE_START_JITTER;
     };
     state.pulseSelectedTurn = (preserveNextPulse = false) => {
-      if (REDUCED || !state.selected) return;
+      if (REDUCED || !state.selected) return false;
+      if (!(sheet.complete && sheet.naturalWidth) || state.previewHandoffPending) {
+        state.selectionPulsePending = true;
+        return false;
+      }
       const direction = Math.random() < 0.5 ? -1 : 1;
-      const strength = SELECTED_PULSE_MIN + Math.random() *
-        (SELECTED_PULSE_MAX - SELECTED_PULSE_MIN);
-      state.dialVel = clamp(state.dialVel + direction * strength, -DIAL_V_MAX, DIAL_V_MAX);
+      state.selectedTurn = {
+        startedAt: performance.now(),
+        from: state.angle,
+        distance: direction * (SELECTED_TURN_MIN_RAD + Math.random() *
+          (SELECTED_TURN_MAX_RAD - SELECTED_TURN_MIN_RAD)),
+        duration: SELECTED_TURN_MIN_MS + Math.random() *
+          (SELECTED_TURN_MAX_MS - SELECTED_TURN_MIN_MS),
+      };
       if (!preserveNextPulse) {
         state.nextSelectedPulseAt = performance.now() + SELECTED_PULSE_GAP_MIN + Math.random() *
           (SELECTED_PULSE_GAP_MAX - SELECTED_PULSE_GAP_MIN);
       }
+      return true;
     };
     state.preloadPreview = (index, priority = 1) => {
       if (!state.previews) return Promise.resolve(null);
@@ -693,15 +709,12 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         // a strong opening turn as an invitation to explore it further.
         state.requestFull();
         state.noteManualTurn();
-        // Fire at the tap itself, even while the lightweight local frame ring
-        // is visible. A second full-canvas turn below preserves that invitation
-        // once every 3D angle is available.
+        // Start now when the full sheet is already ready; otherwise retain a
+        // pending opening turn that begins on its first safe canvas paint.
         state.pulseSelectedTurn(true);
-        if (!(sheet.complete && sheet.naturalWidth && !state.previewHandoffPending)) {
-          state.selectionPulsePending = true;
-        }
       } else if (!value) {
         state.selectionPulsePending = false;
+        state.selectedTurn = null;
         state.nextSelectedPulseAt = Infinity;
       }
       state.strokeTarget = value || state.hovered ? STROKE_PX : 0;
@@ -765,8 +778,8 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       const springK = state.dragging || state.mobileGesture?.rotating
         ? DIAL_K * DRAG_K_SCALE : DIAL_K;
       if (!REDUCED && state.selected && !state.hovered && !state.dragging &&
-        !state.mobileGesture && now - state.lastManualTurnAt >= SELECTED_IDLE_MS &&
-        now >= state.nextSelectedPulseAt) {
+        !state.mobileGesture && !state.selectionPulsePending &&
+        now - state.lastManualTurnAt >= SELECTED_IDLE_MS && now >= state.nextSelectedPulseAt) {
         state.pulseSelectedTurn();
       }
       state.dialVel += (-springK * Math.sin(state.angle)) * dt;
@@ -784,6 +797,17 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       }
       state.dialVel = clamp(state.dialVel, -DIAL_V_MAX, DIAL_V_MAX);
       state.angle += state.dialVel * dt;
+      if (state.selectedTurn) {
+        const turn = state.selectedTurn;
+        const progress = clamp((now - turn.startedAt) / turn.duration, 0, 1);
+        // Strong at the start, soft at the end: visible invitation without a
+        // mechanical stop before the spring naturally returns it home.
+        const eased = 1 - (1 - progress) ** 3;
+        const physicalAngle = state.angle;
+        state.angle = turn.from + turn.distance * eased;
+        state.dialVel = (state.angle - physicalAngle) / dt;
+        if (progress >= 1) state.selectedTurn = null;
+      }
       const dialAcc = (state.dialVel - state.prevDialVel) / dt;
       state.prevDialVel = state.dialVel;
 

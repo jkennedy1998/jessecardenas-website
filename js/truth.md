@@ -40,3 +40,7 @@
 ### 2026-11-08T14:38Z-immediate-strong-selection-turn
 - j-quote: "I notice them now but they are still kind of slow and also don't happen on Earing select, I notice that it moves really slowly, then I have to wait for it to impulse. Let's increase impulse, randomize impulse a bit for course, and then make sure it fires on earing select"
 - interpretation: a selection turn fires immediately on the tap (including the progressive preview ring), then fires again after a pending full-sheet handoff; use a substantially stronger, broadly randomized `7–12 rad/s` selected-turn range so the 3D invitation reads instantly.
+
+### 2026-11-08T14:44Z-visible-first-selection-turn
+- j-quote: "Still don't see it on first click for the earrings being selected and being made big. Dig into the code and let's figure out why this isn't firing"
+- interpretation: the progressive preview ring clamps velocity-only selection impulses to its ±2-frame availability, and the sheet handoff resets dial state. A selection must instead retain a pending, randomized authored turn and run that visible segment only once the full-sheet canvas can render all frames; preloaded sheets run it immediately on tap.
