@@ -55,8 +55,8 @@ function createShopLoader() {
   const screen = document.querySelector(".shop-loading");
   const title = screen?.querySelector(".shop-loading-title");
   const openedAt = performance.now();
-  const minimumDuration = 3200;
-  const settleDuration = 700;
+  const minimumDuration = 1920;
+  const settleDuration = 420;
   let revealed = false;
   if (title) {
     const text = title.textContent;
@@ -74,10 +74,10 @@ function createShopLoader() {
     // Preserve each letter's live phase while progressively reducing its
     // playback rate. It reads as a few quick loading passes that naturally
     // settle instead of a CSS animation resetting right before the fade.
-    [0.76, 0.5, 0.28].forEach((rate, index) => {
+    [0.66, 0.36, 0.18].forEach((rate, index) => {
       window.setTimeout(() => {
         for (const animation of animations) animation.updatePlaybackRate?.(rate);
-      }, index * 210);
+      }, index * 125);
     });
   };
   return {

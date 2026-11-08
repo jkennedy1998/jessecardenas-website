@@ -16,3 +16,7 @@
 ### 2026-11-08T13:48Z-mobile-balance-and-focus
 - j-quote: "I think the in mobile the grid being fixed to the top makes it feel unbalanced when there is no selection made. Also let's make the selected Earing bigger on mobile. It's kind of small and hard to see details of it."
 - interpretation: an unselected mobile board is vertically centered as the full composition; once cart detail appears it becomes a top-aligned vertical flow. The active mobile earring receives a larger dedicated focus scale than desktop hover so its visual details remain legible.
+
+### 2026-11-08T14:03Z-mobile-centering-and-shorter-loader
+- j-quote: "I didn't see the grid vertically alligned to center when nothing is selected but I saw it get horizontally moved (weirdly) when nothing was selected. Might of swapped coordinates...\n\nIntro screen looks better. Let's make it 60 percent of its current length minimum"
+- interpretation: the unselected phone board needs explicit two-axis viewport centering without an offset from the collapsed cart track. Scale the complete fast-load intro timing (hold, settle, and fade) to 60% while retaining the decelerated exit.

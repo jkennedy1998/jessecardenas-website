@@ -45,7 +45,7 @@ main { flex: 1; }
   background: #ffffff;
   color: #a036dd;
   opacity: 1;
-  transition: opacity 0.7s cubic-bezier(0.22, 0.8, 0.24, 1), visibility 0s linear 0.7s;
+  transition: opacity 0.42s cubic-bezier(0.22, 0.8, 0.24, 1), visibility 0s linear 0.42s;
 }
 
 .shop-loading.is-ready {
@@ -605,10 +605,22 @@ body.has-selection.is-selling-open .shop-panel {
   .earring-stage {
     --board-pane-width: min(92vw, 480px);
     grid-template-columns: var(--board-pane-width) 0px;
-    /* An unselected board is the whole composition, not a header: center it
-       in the available phone viewport rather than pinning it to the top. */
-    align-content: center;
     padding: 1.5rem 1rem;
+  }
+
+  /* Grid track alignment fought the collapsed second column and produced a
+     horizontal nudge. With no cart, make the board the sole flex child: its
+     exact width stays centered on both axes in the live phone viewport. */
+  body:not(.has-selection) .earring-stage {
+    display: flex;
+    min-height: 100dvh;
+    align-items: center;
+    justify-content: center;
+  }
+
+  body:not(.has-selection) .board-pane {
+    flex: 0 0 var(--board-pane-width);
+    width: var(--board-pane-width);
   }
 
   body.has-selection .earring-stage {
