@@ -71,6 +71,15 @@ const DIAL_DRAG_EASE = 10; // 1/s, how fast the dial follows pointer speed
 const DRAG_K_SCALE = 0.3; // rest-spring relax factor while dragging
 const DIAL_PX_PER_RAD = 110; // lower-half swipe: screen px per radian
 const DIAL_V_MAX = 15; // rad/s, dial velocity cap
+// A selected piece gets an occasional intentionally gentle turn only after
+// the user has left it alone. Each state owns its own random cadence so a
+// cart reads like several living earrings, never a synchronized carousel.
+const SELECTED_IDLE_MS = 5000;
+const SELECTED_PULSE_START_JITTER = 1200;
+const SELECTED_PULSE_MIN = 1.4; // rad/s impulse — visibly turns, never whips
+const SELECTED_PULSE_MAX = 3;
+const SELECTED_PULSE_GAP_MIN = 2800;
+const SELECTED_PULSE_GAP_MAX = 6200;
 const HOVER_KICK = 9; // rad/s, wiggle impulse on hover
 const PICKUP_KICK = 14; // rad/s, bigger wiggle impulse on pickup
 const CLICK_PX = 6; // pointer travel below which a press is a click (select)
@@ -226,11 +235,12 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
   function attachDrag(state, grabber, releaseExtra) {
     const isTouchLayout = () => window.matchMedia("(max-width: 900px)").matches;
     grabber.addEventListener("pointerdown", (event) => {
+      const now = performance.now();
+      state.noteManualTurn?.(now);
       // Compact layout: taps toggle this earring in the cart. A selected
       // earring may instead be held and swiped horizontally to turn it; touch
       // never moves its position on the grate.
       if (isTouchLayout()) {
-        const now = performance.now();
         state.mobileGesture = {
           x: event.clientX, y: event.clientY, t: now,
           lastX: event.clientX, lastT: now,
@@ -262,6 +272,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
           state.requestFull?.();
         }
         if (gesture.rotating) {
+          state.noteManualTurn?.(now);
           const dt = Math.max((now - gesture.lastT) / 1000, 1 / 240);
           const dx = event.clientX - gesture.lastX;
           // The sequence dial is the visual rotation. Move it directly for a
@@ -276,6 +287,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       }
       if (!state.dragging || !state.pointer) return;
       const now = performance.now();
+      state.noteManualTurn?.(now);
       const dt = Math.max((now - state.pointer.t) / 1000, 1 / 240);
       const dx = event.clientX - state.pointer.x;
       const dy = event.clientY - state.pointer.y;
@@ -297,6 +309,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     });
 
     const release = (event) => {
+      state.noteManualTurn?.();
       if (grabber.hasPointerCapture && grabber.hasPointerCapture(event.pointerId)) {
         grabber.releasePointerCapture(event.pointerId);
       }
@@ -485,6 +498,8 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       previewFrames: new Map(), previewRadius: 0, previewIndex: null,
       previewRetired: false, previewHandoffPending: false,
       fullRequested: false,
+      // Selected turns are deferred from the most recent direct touch/drag.
+      lastManualTurnAt: performance.now(), nextSelectedPulseAt: Infinity,
       // dial state: angle (rad, unbounded) maps onto the sequence —
       // frameF = angle/TAU * count + offset, looping on 0 and last
       angle: 0, dialVel: 0, prevDialVel: 0,
@@ -518,6 +533,13 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       if (state.fullRequested) return;
       state.fullRequested = true;
       sheet.src = sheetUrl;
+    };
+    state.noteManualTurn = (at = performance.now()) => {
+      state.lastManualTurnAt = at;
+      // Never pulse before five quiet seconds, then stagger different pieces
+      // so a multi-item selection does not wake up in lockstep.
+      if (state.selected) state.nextSelectedPulseAt = at + SELECTED_IDLE_MS +
+        Math.random() * SELECTED_PULSE_START_JITTER;
     };
     state.preloadPreview = (index, priority = 1) => {
       if (!state.previews) return Promise.resolve(null);
@@ -650,7 +672,16 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     // opts.onSelect to route the click there and shop:change calls
     // state.setSelected to sync the visual.
     state.setSelected = (value) => {
+      const changed = state.selected !== value;
       state.selected = value;
+      if (changed && value) {
+        // A cart selection is direct intent: prepare its full turn sequence,
+        // then give it at least five quiet seconds before its first pulse.
+        state.requestFull();
+        state.noteManualTurn();
+      } else if (!value) {
+        state.nextSelectedPulseAt = Infinity;
+      }
       state.strokeTarget = value || state.hovered ? STROKE_PX : 0;
       state.scaleTarget = state.baseScale *
         (state.mobileFocused ? MOBILE_FOCUS_SCALE : (state.hovered ? HOVER_SCALE : 1));
@@ -711,6 +742,16 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       // around visibly spins it through its frames.
       const springK = state.dragging || state.mobileGesture?.rotating
         ? DIAL_K * DRAG_K_SCALE : DIAL_K;
+      if (!REDUCED && state.selected && !state.hovered && !state.dragging &&
+        !state.mobileGesture && now - state.lastManualTurnAt >= SELECTED_IDLE_MS &&
+        now >= state.nextSelectedPulseAt) {
+        const direction = Math.random() < 0.5 ? -1 : 1;
+        const strength = SELECTED_PULSE_MIN + Math.random() *
+          (SELECTED_PULSE_MAX - SELECTED_PULSE_MIN);
+        state.dialVel += direction * strength;
+        state.nextSelectedPulseAt = now + SELECTED_PULSE_GAP_MIN + Math.random() *
+          (SELECTED_PULSE_GAP_MAX - SELECTED_PULSE_GAP_MIN);
+      }
       state.dialVel += (-springK * Math.sin(state.angle)) * dt;
       state.dialVel -= state.dialVel * DIAL_DAMP * dt;
       state.dialVel += -(axPx / state.effLength) * Math.cos(state.angle) * dt * DIAL_KICK;

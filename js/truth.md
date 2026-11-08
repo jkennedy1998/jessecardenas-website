@@ -28,3 +28,7 @@
 ### 2026-11-08T14:16Z-mobile-card-during-board-motion
 - j-quote: "I notice if the screen is moving the text box doesn't get created in the right spot. Once screen settles it is in the right spot for the text box next to the Earing -- but only on new eating text boxes. The text box created when the Earing is being selected is created and stays at the wrong y height"
 - interpretation: a mobile detail card created during the board's layout glide must track the board's live visual bounds until motion completes, so the initial selected earring card does not retain a pre-settle vertical coordinate.
+
+### 2026-11-08T14:24Z-selected-earring-idle-pulses
+- j-quote: "Let's make it so selected earings spin slowly and nicely when the user has them selected but the user has not dragged them in the last 5 seconds. This should happen on selected as well so each Earing spins a little bit ideally with a pulse in a random direction and random strength."
+- interpretation: each cart-selected earring independently waits five seconds after direct manipulation, then gives its frame-sequence dial small randomized direction/strength impulses at an irregular cadence. Interaction resets the quiet timer; reduced-motion visitors receive no autonomous pulses.
