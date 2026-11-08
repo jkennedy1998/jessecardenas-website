@@ -55,6 +55,8 @@ function createShopLoader() {
   const screen = document.querySelector(".shop-loading");
   const title = screen?.querySelector(".shop-loading-title");
   const openedAt = performance.now();
+  const minimumDuration = 3200;
+  const settleDuration = 700;
   let revealed = false;
   if (title) {
     const text = title.textContent;
@@ -67,15 +69,29 @@ function createShopLoader() {
       return letter;
     }));
   }
+  const slowWaveForExit = () => {
+    const animations = title?.getAnimations?.({ subtree: true }) || [];
+    // Preserve each letter's live phase while progressively reducing its
+    // playback rate. It reads as a few quick loading passes that naturally
+    // settle instead of a CSS animation resetting right before the fade.
+    [0.76, 0.5, 0.28].forEach((rate, index) => {
+      window.setTimeout(() => {
+        for (const animation of animations) animation.updatePlaybackRate?.(rate);
+      }, index * 210);
+    });
+  };
   return {
     reveal() {
-      // The rest-pose promise and the network safety timer race deliberately.
-      // Only the first caller may start the exit, keeping slow/offline visits
-      // from trapping someone behind an otherwise beautiful loader.
+      // The screen stays long enough to communicate a deliberate arrival,
+      // then the live wave slows into the page reveal once the board is ready.
       if (!screen || revealed) return;
       revealed = true;
-      const delay = Math.max(0, 550 - (performance.now() - openedAt));
-      window.setTimeout(() => screen.classList.add("is-ready"), delay);
+      const delay = Math.max(0, minimumDuration - (performance.now() - openedAt));
+      window.setTimeout(() => {
+        screen.classList.add("is-settling");
+        slowWaveForExit();
+        window.setTimeout(() => screen.classList.add("is-ready"), settleDuration);
+      }, delay);
     },
   };
 }
@@ -855,6 +871,30 @@ async function initEarringsPage() {
     };
     board.addEventListener("animationend", onLeaveEnd);
   }
+
+  // Earrings own their own tap/hold/swipe gestures. A touch that begins on
+  // the bare grate instead pages the board, giving mobile the same carousel
+  // control as the dots without stealing any earring interaction.
+  const BOARD_PAGE_SWIPE_PX = 44;
+  let gridSwipe = null;
+  board.addEventListener("pointerdown", (event) => {
+    if (!isCompactLayout() || event.pointerType !== "touch" || event.target !== board) return;
+    gridSwipe = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    board.setPointerCapture(event.pointerId);
+  });
+  board.addEventListener("pointerup", (event) => {
+    if (!gridSwipe || event.pointerId !== gridSwipe.id) return;
+    const { x, y } = gridSwipe;
+    gridSwipe = null;
+    const dx = event.clientX - x;
+    const dy = event.clientY - y;
+    if (Math.abs(dx) < BOARD_PAGE_SWIPE_PX || Math.abs(dx) <= Math.abs(dy) * 1.35) return;
+    // A leftward finger swipe advances to the next board; a rightward one
+    // returns to the previous board. switchTo keeps the animation and
+    // inertial direction shared with the dot controls.
+    switchTo(activeIndex + (dx < 0 ? 1 : -1));
+  });
+  board.addEventListener("pointercancel", () => { gridSwipe = null; });
 
   function syncSelection() {
     const selected = window.Shop.summary().list;

@@ -70,12 +70,12 @@ main { flex: 1; }
   display: inline-block;
   min-width: 0.22em;
   color: #d26de8;
-  /* Two independent traveling peaks. The weight crest advances one letter
-     every .2s, while the purple crest travels at a different cadence, so the
-     loop reads as a living word rather than a synchronized type effect. */
-  animation: shop-loading-weight-wave 3.6s steps(4, end) infinite,
-    shop-loading-color-wave 5.27s ease-in-out infinite;
-  animation-delay: calc(var(--letter-index) * -0.2s), calc(var(--letter-index) * -0.31s);
+  /* Two independent traveling peaks. Their positive stagger sends the crest
+     left-to-right; at this pace it advances a letter every .06s, over 3x
+     faster than the first pass, while color keeps its own rhythm. */
+  animation: shop-loading-weight-wave 1.05s steps(4, end) infinite,
+    shop-loading-color-wave 1.57s ease-in-out infinite;
+  animation-delay: calc(var(--letter-index) * 0.06s), calc(var(--letter-index) * 0.093s);
   will-change: color, font-weight;
 }
 
@@ -329,6 +329,12 @@ main { flex: 1; }
 /* a switching board ignores the pointer so a mid-swap hover or drag can
    never grab a dying earring */
 .earring-board.is-switching { pointer-events: none; }
+
+/* Blank grid space is an intentional mobile paging gesture surface. Earring
+   hit areas opt into their own touch handling, so they never page the board. */
+@media (max-width: 900px) {
+  .earring-board { touch-action: pan-y; }
+}
 
 .earring-dangle {
   position: absolute;

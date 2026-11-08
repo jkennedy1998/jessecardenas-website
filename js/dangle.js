@@ -91,9 +91,10 @@ const SWING_HOVER = 0.26; // rad/s, swing impulse on hover
 const SWING_PICKUP = 0.44; // rad/s, swing impulse on pickup
 // Board switch: sliding the grate sideways shoves the hanging pieces —
 // inertia makes them lag the slide, swing back, and turn a little
-// through their frames before settling. The shove kicks opposite to
-// travel (lag), magnitude jittered per earring so they never move in
-// lockstep (see switchKick).
+// through their frames before settling. The physical swing trails travel;
+// the sequence dial uses the opposite sign so its apparent rotation agrees
+// with the board's page direction. Magnitude jitters per earring so they
+// never move in lockstep (see switchKick).
 const SWITCH_SHOVE = 0.95; // rad/s, inertial swing shove (jelly path)
 const SWITCH_SHOVE_DIAL = 9; // rad/s, frame-dial shove (jelly path)
 const SWITCH_SHOVE_LEGACY = 2.6; // rad/s, pendulum shove (legacy path)
@@ -1162,7 +1163,9 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       const jitter = 1 + (Math.random() * 2 - 1) * SWITCH_SHOVE_JITTER;
       if (typeof state.swingVel === "number") {
         state.swingVel -= SWITCH_SHOVE * travel * jitter;
-        state.dialVel -= SWITCH_SHOVE_DIAL * travel * jitter;
+        // The pendant's swing trails the moving board, but the photographed
+        // turn sequence should read with the page advance, not against it.
+        state.dialVel += SWITCH_SHOVE_DIAL * travel * jitter;
       } else {
         state.velocity -= SWITCH_SHOVE_LEGACY * travel * jitter;
       }
