@@ -36,3 +36,7 @@
 ### 2026-11-08T14:31Z-selection-opening-turn
 - j-quote: "It should ideally happen on the tap that selects the Earing too so that it pulls the user to rotate it / shows them the Earing in 3d without needing them to do anything. Also I notice that it's kind of a little rotation . Let's increase it's overall force by 2"
 - interpretation: a new selection triggers a randomized opening turn as soon as the full-sheet canvas safely owns the render, inviting manual rotation; selected-turn impulses use exactly double the prior force range while subsequent idle turns retain their independent cadence.
+
+### 2026-11-08T14:38Z-immediate-strong-selection-turn
+- j-quote: "I notice them now but they are still kind of slow and also don't happen on Earing select, I notice that it moves really slowly, then I have to wait for it to impulse. Let's increase impulse, randomize impulse a bit for course, and then make sure it fires on earing select"
+- interpretation: a selection turn fires immediately on the tap (including the progressive preview ring), then fires again after a pending full-sheet handoff; use a substantially stronger, broadly randomized `7–12 rad/s` selected-turn range so the 3D invitation reads instantly.

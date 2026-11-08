@@ -71,13 +71,13 @@ const DIAL_DRAG_EASE = 10; // 1/s, how fast the dial follows pointer speed
 const DRAG_K_SCALE = 0.3; // rest-spring relax factor while dragging
 const DIAL_PX_PER_RAD = 110; // lower-half swipe: screen px per radian
 const DIAL_V_MAX = 15; // rad/s, dial velocity cap
-// A selected piece gets an occasional intentionally gentle turn only after
-// the user has left it alone. Each state owns its own random cadence so a
+// A selected piece gets an occasional inviting turn after the user has left
+// it alone. Each state owns its own random cadence so a
 // cart reads like several living earrings, never a synchronized carousel.
 const SELECTED_IDLE_MS = 5000;
 const SELECTED_PULSE_START_JITTER = 1200;
-const SELECTED_PULSE_MIN = 2.8; // rad/s impulse — 2x the original turn force
-const SELECTED_PULSE_MAX = 6;
+const SELECTED_PULSE_MIN = 7; // rad/s impulse — a clear, inviting 3D turn
+const SELECTED_PULSE_MAX = 12; // broad random range keeps each turn distinct
 const SELECTED_PULSE_GAP_MIN = 2800;
 const SELECTED_PULSE_GAP_MAX = 6200;
 const HOVER_KICK = 9; // rad/s, wiggle impulse on hover
@@ -693,9 +693,11 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         // a strong opening turn as an invitation to explore it further.
         state.requestFull();
         state.noteManualTurn();
-        if (sheet.complete && sheet.naturalWidth && !state.previewHandoffPending) {
-          state.pulseSelectedTurn(true);
-        } else {
+        // Fire at the tap itself, even while the lightweight local frame ring
+        // is visible. A second full-canvas turn below preserves that invitation
+        // once every 3D angle is available.
+        state.pulseSelectedTurn(true);
+        if (!(sheet.complete && sheet.naturalWidth && !state.previewHandoffPending)) {
           state.selectionPulsePending = true;
         }
       } else if (!value) {
