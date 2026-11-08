@@ -525,9 +525,8 @@ body.has-selection.is-selling-open .shop-panel {
     gap: 1rem;
   }
 
-  /* Touch has no hover card: tap toggles cart selection directly, while a
-     hold-and-swipe on the focused pick turns it without moving it. */
-  .earring-hover-card { display: none; }
+  /* The active cart selection uses the same detail card desktop reveals on
+     hover; touch has no transient hover state. */
 
   .shop-panel {
     min-height: auto;

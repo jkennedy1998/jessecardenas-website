@@ -629,16 +629,23 @@ async function initEarringsPage() {
           frameOffset: entry.frameOffset || 0,
           accentColor: paletteFor(entry.colors?.accent).dark,
           onSelect: () => {
-            if (isCompactLayout()) {
-              // A tap changes cart truth directly. The most recently added
-              // item becomes the one enlarged on the board; tapping it again
-              // removes it, and the latest remaining pick takes focus.
-              if (window.Shop.has(entry.productId)) {
-                if (lastSelectedProductId === entry.productId) lastSelectedProductId = null;
-              } else {
-                lastSelectedProductId = entry.productId;
-              }
+            if (!isCompactLayout()) {
+              window.Shop.toggle(entry);
+              return;
             }
+            if (window.Shop.has(entry.productId)) {
+              if (lastSelectedProductId !== entry.productId) {
+                // A selected-but-inactive earring becomes the active focus;
+                // only a second tap on the active one removes it from cart.
+                lastSelectedProductId = entry.productId;
+                syncSelection();
+                return;
+              }
+              lastSelectedProductId = null;
+              window.Shop.toggle(entry);
+              return;
+            }
+            lastSelectedProductId = entry.productId;
             window.Shop.toggle(entry);
           },
           onHover: (state) => {
@@ -757,9 +764,18 @@ async function initEarringsPage() {
     }
     const focusedProductId = isCompactLayout() ? lastSelectedProductId : null;
     setActiveColor(entries);
-    for (const { entry, state } of activeJellies) {
+    let focusedJelly = null;
+    for (const jelly of activeJellies) {
+      const { entry, state } = jelly;
       state.setSelected(selectedIds.has(entry.productId));
       state.setMobileFocused?.(entry.productId === focusedProductId);
+      if (entry.productId === focusedProductId) focusedJelly = jelly;
+    }
+    // Mobile has no hover, so the selected active earring owns the same
+    // detail card desktop shows on hover. It closes when the cart is empty.
+    if (isCompactLayout()) {
+      if (focusedJelly) hoverCard?.show(focusedJelly.entry, focusedJelly.state);
+      else hoverCard?.hide();
     }
   }
 

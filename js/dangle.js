@@ -308,7 +308,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       state.dangle.style.left = `${state.x * 100}%`;
       state.dangle.style.top = `${state.y * 100}%`;
       state.dangle.style.scale = String(state.renderedScale);
-      state.dangle.style.zIndex = String(state.hovered
+      state.dangle.style.zIndex = String(state.hovered || state.mobileFocused
         ? HOVER_DEPTH
         : Math.round((1 - state.y) * BASE_DEPTH_RANGE));
       // The shadow hangs off the board, not the dangle, so it carries its
