@@ -52,3 +52,7 @@
 ### 2026-11-08T14:53Z-slower-selection-turn
 - j-quote: "Slow it doesn't even more for the impulse please. Maybe 60 percent of current"
 - interpretation: use 60% of the current selection-turn angular speed by extending the randomized turn duration from 520–820ms to 870–1370ms, without reducing the visible turn range.
+
+### 2026-11-08T15:01Z-selection-grid-composition
+- j-quote: "Yeah this is much better. I think ideally the cart page / grid that displayed the earrings when earigns are selected can do something like spread out the earrings nicely and evenly. It shouldn't use the bottom two rows, or any of the nodes on the edges. Maybe ideally 1 space apart for nodes? Might have it be smartly set up so it can do all kinds of numbers. Maybe up to like 10?"
+- interpretation: the automatic cart-selection board composes 1–10 picks across only the grate's inner rows/columns, excludes rows eight and nine, and preserves at least one empty node between hooks where its 4×4 spaced lattice permits it; smaller counts use centered horizontal or cross arrangements.

@@ -673,6 +673,60 @@ function resolveNodes(list) {
   });
 }
 
+// The selection board is a composed cart view, not a saved layout. Keep its
+// hooks clear of the outer grate and its two bottom rows, with an empty node
+// between neighbouring picks whenever the cart holds the intended 1–10 items.
+const SELECTION_INTERIOR_MIN = 1;
+const SELECTION_INTERIOR_MAX = 7;
+const SELECTION_SPACED_CAPACITY = 16;
+
+function spreadAxis(count) {
+  if (count === 1) return [4];
+  return Array.from({ length: count }, (_, index) => Math.round(
+    SELECTION_INTERIOR_MIN + index * (SELECTION_INTERIOR_MAX - SELECTION_INTERIOR_MIN) / (count - 1)
+  ));
+}
+
+function centeredRowCounts(total, rows) {
+  const counts = Array(rows).fill(Math.floor(total / rows));
+  const extras = total % rows;
+  if (extras === 1) {
+    counts[Math.floor(rows / 2)] += 1;
+  } else if (extras === 2 && rows === 3) {
+    counts[0] += 1;
+    counts[2] += 1;
+  } else {
+    for (let index = 0; index < extras; index += 1) counts[index] += 1;
+  }
+  return counts;
+}
+
+function selectionNodes(count) {
+  if (!count) return [];
+  // Small carts read most evenly as a centered horizontal sequence. Five is
+  // a calm cross rather than an uneven 3+2 block.
+  if (count <= 3) return spreadAxis(count).map((col) => window.Dangle.nodeAt(4, col));
+  if (count === 5) {
+    return [[1, 4], [4, 1], [4, 4], [4, 7], [7, 4]]
+      .map(([row, col]) => window.Dangle.nodeAt(row, col));
+  }
+
+  // Four columns/rows at 1,3,5,7 leave one blank node between every hook.
+  // This covers 6–16 selections; larger carts retain the safe inner area
+  // and simply become denser rather than falling back to edge nodes.
+  const columns = count <= SELECTION_SPACED_CAPACITY
+    ? Math.min(4, Math.ceil(Math.sqrt(count)))
+    : SELECTION_INTERIOR_MAX;
+  const rows = Math.ceil(count / columns);
+  const rowPositions = spreadAxis(rows);
+  const rowCounts = centeredRowCounts(count, rows);
+  const nodes = [];
+  rowCounts.forEach((rowCount, index) => {
+    for (const col of spreadAxis(rowCount)) nodes.push(window.Dangle.nodeAt(rowPositions[index], col));
+  });
+  return nodes;
+}
+
 async function initEarringsPage() {
   const loader = createShopLoader();
   const board = document.querySelector(".earring-board");
@@ -757,9 +811,10 @@ async function initEarringsPage() {
   function boardEntries(layout) {
     const catalog = byProduct();
     if (layout.id === SELECTION_LAYOUT_ID) {
-      return window.Shop.summary().list
-        .map((item) => catalog.get(item.productId)).filter(Boolean)
-        .map((entry, index) => ({ ...entry, node: index + 1 }));
+      const picked = window.Shop.summary().list
+        .map((item) => catalog.get(item.productId)).filter(Boolean);
+      const nodes = selectionNodes(picked.length);
+      return picked.map((entry, index) => ({ ...entry, node: nodes[index] }));
     }
     if (!layout.items) return entries;
     return layout.items

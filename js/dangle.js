@@ -142,6 +142,16 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     return { x, y };
   }
 
+  // The visual board owns the physical node map. Consumers that have a
+  // placement policy (such as the cart board) name a row/column without
+  // duplicating its 1-based index arithmetic or grate dimensions.
+  function nodeAt(row, col) {
+    const gaps = VERTICALS.length - 1;
+    if (!Number.isInteger(row) || !Number.isInteger(col) ||
+      row < 0 || row >= HORIZONTALS.length || col < 0 || col >= gaps) return null;
+    return row * gaps + col + 1;
+  }
+
   const items = [];
   const previewCache = new Map();
   const previewQueue = [];
@@ -1268,5 +1278,5 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
   const preloadPreview = (previews, frameOffset = 0, priority = 1) =>
     previews ? loadPreview(previews, frameOffset, priority) : Promise.resolve(null);
 
-  return { create, createJelly, destroy, switchKick, nodePoint, nearestNode, preloadPreview };
+  return { create, createJelly, destroy, switchKick, nodePoint, nodeAt, nearestNode, preloadPreview };
 })();
