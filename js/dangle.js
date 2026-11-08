@@ -79,10 +79,10 @@ const SELECTED_PULSE_START_JITTER = 1200;
 // A turn is authored as a short, visible segment rather than relying only
 // on damped velocity — the preview ring otherwise clamps that first impulse
 // to ±2 frames before the full sheet arrives.
-const SELECTED_TURN_MIN_RAD = 1.25; // 20% of the sequence, clearly legible
-const SELECTED_TURN_MAX_RAD = 2.15; // 34%, varied but never a full spin
-const SELECTED_TURN_MIN_MS = 460;
-const SELECTED_TURN_MAX_MS = 780;
+const SELECTED_TURN_MIN_RAD = 0.85; // 14% of the sequence: clear, not forceful
+const SELECTED_TURN_MAX_RAD = 1.4; // 22%, with enough variance to feel alive
+const SELECTED_TURN_MIN_MS = 520;
+const SELECTED_TURN_MAX_MS = 820;
 const SELECTED_PULSE_GAP_MIN = 2800;
 const SELECTED_PULSE_GAP_MAX = 6200;
 const HOVER_KICK = 9; // rad/s, wiggle impulse on hover

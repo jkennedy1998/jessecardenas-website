@@ -44,3 +44,7 @@
 ### 2026-11-08T14:44Z-visible-first-selection-turn
 - j-quote: "Still don't see it on first click for the earrings being selected and being made big. Dig into the code and let's figure out why this isn't firing"
 - interpretation: the progressive preview ring clamps velocity-only selection impulses to its ±2-frame availability, and the sheet handoff resets dial state. A selection must instead retain a pending, randomized authored turn and run that visible segment only once the full-sheet canvas can render all frames; preloaded sheets run it immediately on tap.
+
+### 2026-11-08T14:49Z-soften-selection-turn
+- j-quote: "It looks too strong now, let's make it less strong"
+- interpretation: preserve the reliable full-canvas selection turn, but soften its randomized visual range to 14–22% of the sequence and lengthen it slightly for a calmer invitation.
