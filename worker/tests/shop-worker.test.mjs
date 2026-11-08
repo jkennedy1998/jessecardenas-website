@@ -187,6 +187,36 @@ test('Studio publishes Product-ID inventory; checkout holds, payment decrements'
   }
 });
 
+test('published listings auto-link an approved graphic from their Stripe product name', { concurrency: false }, async () => {
+  const { storage } = memoryStorage();
+  const originalFetch = globalThis.fetch;
+  const blueChandelier = {
+    ...product,
+    id: 'prod_blue_chandelier',
+    name: 'Blue chandelier',
+    default_price: { ...product.default_price, id: 'price_blue_chandelier' },
+  };
+  globalThis.fetch = async () => new Response(JSON.stringify({ data: [blueChandelier] }));
+
+  try {
+    const env = { STRIPE_SECRET_KEY: 'test', SITE_ORIGIN: 'https://jessecardenas.com', STUDIO_PASSWORD: 'pw' };
+    const lock = new InventoryLock({ storage }, env);
+    // This covers older stored listings that predate the Studio suggestion;
+    // newly named products receive the same suggestion in Studio before save.
+    await storage.put('listing:prod_blue_chandelier', {
+      productId: 'prod_blue_chandelier', quantity: 1, graphicKey: '', published: true,
+      sizePercent: 100, frameOffset: 0,
+    });
+
+    const catalog = await (await lock.fetch(new Request('https://jessecardenas.com/api/catalog'))).json();
+    assert.equal(catalog.listings[0].graphicKey, 'blue-chandelier');
+    const studio = await (await lock.fetch(new Request('https://jessecardenas.com/api/studio/listings'))).json();
+    assert.equal(studio.listings[0].suggestedGraphicKey, 'blue-chandelier');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('expired holds release without touching stock and stop consuming availability', { concurrency: false }, async () => {
   const { storage, values } = memoryStorage();
   const originalFetch = globalThis.fetch;

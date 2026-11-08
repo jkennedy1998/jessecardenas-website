@@ -1,1 +1,4 @@
 source/earings-to-process*
+# Local source deliveries and visual QA are not deployed shop assets.
+Earrings_v3.zip
+source/earrings/artifacts/

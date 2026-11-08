@@ -82,9 +82,13 @@ window.Studio = (() => {
     const graphicLabel = document.createElement('label');
     graphicLabel.textContent = 'approved graphic';
     const graphic = document.createElement('select');
-    graphic.append(option('', 'choose a prepared graphic', listing.graphicKey));
+    // A Stripe product whose name matches an approved graphic starts with
+    // that graphic selected. Saving makes the choice explicit, while Jesse
+    // can still choose any other approved treatment before publishing.
+    const selectedGraphicKey = listing.graphicKey || listing.suggestedGraphicKey || '';
+    graphic.append(option('', 'choose a prepared graphic', selectedGraphicKey));
     for (const [key, visual] of Object.entries(graphics)) {
-      graphic.append(option(key, visual.slug, listing.graphicKey));
+      graphic.append(option(key, visual.slug, selectedGraphicKey));
     }
     graphicLabel.append(graphic);
 

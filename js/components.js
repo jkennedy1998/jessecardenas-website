@@ -51,6 +51,30 @@ function normalizeMediaPath(file) {
   return ROOT + String(file).replace(/^\/+/, "");
 }
 
+function createShopLoader() {
+  const screen = document.querySelector(".shop-loading");
+  const title = screen?.querySelector(".shop-loading-title");
+  const openedAt = performance.now();
+  if (title) {
+    const text = title.textContent;
+    title.replaceChildren(...[...text].map((character, index) => {
+      const letter = document.createElement("span");
+      letter.className = "shop-loading-letter";
+      if (character === " ") letter.classList.add("is-space");
+      letter.style.setProperty("--letter-index", String(index));
+      letter.textContent = character === " " ? " " : character;
+      return letter;
+    }));
+  }
+  return {
+    reveal() {
+      if (!screen) return;
+      const delay = Math.max(0, 550 - (performance.now() - openedAt));
+      window.setTimeout(() => screen.classList.add("is-ready"), delay);
+    },
+  };
+}
+
 function isVideoFile(file) {
   return /\.(mp4|webm|mov)$/i.test(file);
 }
@@ -133,6 +157,14 @@ function buildEarringJelly(entry) {
   // transparent sprite margins made neighboring earrings steal each other's
   // hover/clicks. This smaller plane follows the same pivot and leaves the
   // painted outline fully visible.
+  const preview = document.createElement("img");
+  preview.className = "earring-jelly-preview";
+  preview.alt = "";
+  preview.width = entry.frames.fw;
+  preview.height = entry.frames.fh;
+  preview.style.left = `${-(entry.frames.fw / 2)}px`;
+  preview.style.top = "0px";
+
   const hitArea = document.createElement("div");
   hitArea.className = "earring-jelly-hitarea";
   const hitWidth = Math.round(entry.frames.fw * 0.7);
@@ -140,7 +172,7 @@ function buildEarringJelly(entry) {
   hitArea.style.height = `${entry.frames.fh}px`;
   hitArea.style.left = `${-hitWidth / 2}px`;
 
-  dangle.append(canvas, hitArea);
+  dangle.append(canvas, preview, hitArea);
   return dangle;
 }
 
@@ -556,6 +588,7 @@ function resolveNodes(list) {
 }
 
 async function initEarringsPage() {
+  const loader = createShopLoader();
   const board = document.querySelector(".earring-board");
   const container = document.querySelector(".slices");
   const stage = document.querySelector(".earring-stage");
@@ -565,11 +598,13 @@ async function initEarringsPage() {
     entries = await currentListings();
   } catch {
     showShopStatus(stage, "the shop is temporarily unavailable — please try again soon.");
+    loader.reveal();
     return;
   }
   if (!entries.length) {
     if (container) container.innerHTML = '<p class="slice-empty">no earrings listed yet — check back soon.</p>';
     else showShopStatus(stage, "no earrings listed yet — check back soon.");
+    loader.reveal();
     return;
   }
 
@@ -582,6 +617,14 @@ async function initEarringsPage() {
   let switching = false;
 
   const byProduct = () => new Map(entries.map((entry) => [entry.productId, entry]));
+  const previewFor = (entry) => entry.frames?.previewPath
+    ? { path: normalizeMediaPath(entry.frames.previewPath), count: entry.frames.count }
+    : null;
+  // Queue every listing's resting pose before any nearby-angle work. The
+  // overlay waits for this lightweight catalog-wide first paint, not for the
+  // much larger motion sheets.
+  const posterLoads = entries.map((entry) =>
+    window.Dangle.preloadPreview(previewFor(entry), entry.frameOffset || 0));
 
   // One layout -> the entries it displays. Saved layouts carry productId/node
   // pairs; unavailable earrings drop out and their slot goes empty. The
@@ -627,6 +670,7 @@ async function initEarringsPage() {
           node: entry.node, frames,
           scale: BOARD_BASE_SCALE * ((entry.sizePercent || 100) / 100), length: 140,
           frameOffset: entry.frameOffset || 0,
+          previews: previewFor(entry),
           accentColor: paletteFor(entry.colors?.accent).dark,
           onSelect: () => {
             if (!isCompactLayout()) {
@@ -654,6 +698,9 @@ async function initEarringsPage() {
             else hoverCard?.hide();
           },
         });
+        // Only after every listing's rest poster is queued may this visible
+        // board ask for a small ring of nearby turning angles.
+        void jellyState.preloadRange(2);
         activeJellies.push({ entry, state: jellyState });
         continue;
       }
@@ -782,6 +829,7 @@ async function initEarringsPage() {
   mountLayout(layouts[0]);
   renderDots();
   window.addEventListener("resize", syncSelection);
+  void Promise.all(posterLoads).then(() => loader.reveal());
 
   const panel = document.querySelector(".shop-panel");
   if (panel) buildShopPanel(panel);

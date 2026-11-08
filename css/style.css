@@ -33,6 +33,67 @@ body {
 
 main { flex: 1; }
 
+/* ---------- shop loading overlay ---------- */
+
+.shop-loading {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: #ffffff;
+  color: #a036dd;
+  opacity: 1;
+  transition: opacity 0.7s cubic-bezier(0.22, 0.8, 0.24, 1), visibility 0s linear 0.7s;
+}
+
+.shop-loading.is-ready {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.shop-loading-title {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 14ch;
+  font-size: clamp(2.2rem, 10vw, 5.5rem);
+  font-weight: 400;
+  line-height: 0.96;
+  letter-spacing: -0.035em;
+  text-align: center;
+}
+
+.shop-loading-letter {
+  display: inline-block;
+  min-width: 0.22em;
+  color: #d26de8;
+  animation: shop-loading-weight 3.6s steps(4, end) infinite,
+    shop-loading-color 5.3s ease-in-out infinite alternate;
+  animation-delay: calc(var(--letter-index) * -0.2s), calc(var(--letter-index) * -0.31s);
+}
+
+.shop-loading-letter.is-space { min-width: 0.28em; }
+
+@keyframes shop-loading-weight {
+  0%, 100% { font-weight: 300; }
+  25% { font-weight: 400; }
+  50% { font-weight: 600; }
+  75% { font-weight: 700; }
+}
+
+@keyframes shop-loading-color {
+  0% { color: #edb8f7; }
+  50% { color: #d26de8; }
+  100% { color: #a036dd; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-loading-letter { animation: none; color: #a036dd; font-weight: 600; }
+}
+
 /* ---------- top bar / bottom bar ---------- */
 
 .site-bar {
@@ -295,12 +356,22 @@ main { flex: 1; }
 
 .earring-dangle-jelly { width: 0; height: 0; }
 
-.earring-jelly {
+.earring-jelly,
+.earring-jelly-preview {
   position: absolute;
   top: 0;
   transform-origin: 50% 0;
   pointer-events: none;
-  z-index: 3;
+}
+
+.earring-jelly { z-index: 3; }
+
+/* Small per-frame WebPs appear first; the full sprite canvas draws over them
+   only after an interaction asks for that heavier asset. */
+.earring-jelly-preview {
+  z-index: 2;
+  object-fit: fill;
+  image-rendering: auto;
 }
 
 /* A deliberately narrower interaction plane follows the sprite without

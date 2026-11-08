@@ -126,7 +126,55 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
   }
 
   const items = [];
+  const previewCache = new Map();
+  const previewQueue = [];
+  let previewLoads = 0;
+  const MAX_PREVIEW_LOADS = 4;
   const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, value));
+  const wrapFrame = (index, count) => ((index % count) + count) % count;
+  const signedFrameDistance = (index, center, count) => {
+    const distance = wrapFrame(index - center, count);
+    return distance > count / 2 ? distance - count : distance;
+  };
+
+  function previewUrl(previews, index) {
+    return `${previews.path}${wrapFrame(index, previews.count)}.webp`;
+  }
+
+  function pumpPreviewQueue() {
+    while (previewLoads < MAX_PREVIEW_LOADS && previewQueue.length) {
+      const entry = previewQueue.shift();
+      previewLoads += 1;
+      entry.image.addEventListener("load", () => {
+        entry.ready = true;
+        previewLoads -= 1;
+        entry.resolve(entry.image);
+        pumpPreviewQueue();
+      }, { once: true });
+      entry.image.addEventListener("error", () => {
+        // A missing progressive image must never keep the loading overlay up;
+        // the later full sheet remains a recoverable fallback.
+        previewLoads -= 1;
+        entry.resolve(null);
+        pumpPreviewQueue();
+      }, { once: true });
+      entry.image.src = entry.url;
+    }
+  }
+
+  function loadPreview(previews, index, priority = 1) {
+    const url = previewUrl(previews, index);
+    const cached = previewCache.get(url);
+    if (cached) return cached.promise;
+    const image = new Image();
+    const entry = { url, image, ready: false, resolve: null, promise: null };
+    entry.promise = new Promise((resolve) => { entry.resolve = resolve; });
+    previewCache.set(url, entry);
+    const insertAt = previewQueue.findIndex((candidate) => candidate.priority > priority);
+    previewQueue.splice(insertAt === -1 ? previewQueue.length : insertAt, 0, { ...entry, priority });
+    pumpPreviewQueue();
+    return entry.promise;
+  }
   const hexToRgb = (color) => {
     const hex = String(color || "").replace(/^#/, "");
     if (!/^[\da-f]{6}$/i.test(hex)) return [1, 1, 1];
@@ -199,6 +247,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         if (gesture.selected && !gesture.rotating &&
           now - gesture.t >= MOBILE_ROTATE_HOLD_MS && travel >= MOBILE_ROTATE_START_PX) {
           gesture.rotating = true;
+          state.requestFull?.();
         }
         if (gesture.rotating) {
           const dt = Math.max((now - gesture.lastT) / 1000, 1 / 240);
@@ -352,8 +401,10 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     // optional stroke — everything else (dial, swing, corners, breeze) is
     // the same physics the board runs
     home = null, shadow = true, stroke = true, hoverScale = HOVER_SCALE,
+    previews = null,
   } = {}) {
     const canvas = dangle.querySelector("canvas.earring-jelly");
+    const preview = dangle.querySelector(".earring-jelly-preview");
     const hitArea = dangle.querySelector(".earring-jelly-hitarea");
     const state = baseState(dangle, dangle.parentElement, { node, scale, length });
 
@@ -405,10 +456,8 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         }, 1000 * sheetRetries);
       }
     });
-    sheet.src = sheetUrl;
-
     Object.assign(state, {
-      canvas, hitArea, ctx: null, sheet,
+      canvas, preview, hitArea, ctx: null, sheet,
       hovered: false, onHover,
       accentColor, strokeColor: "#ffffff", strokeRgb: [1, 1, 1],
       useStroke: stroke,
@@ -418,6 +467,9 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       fw: frames.fw, fh: frames.fh, cols: frames.cols, count: frames.count,
       fps: 1000 / (frames.frameMs || 40),
       frameOffset,
+      previews: previews ? { path: previews.path, count: frames.count } : null,
+      previewFrames: new Map(), previewRadius: 0, previewIndex: null,
+      fullRequested: false,
       // dial state: angle (rad, unbounded) maps onto the sequence —
       // frameF = angle/TAU * count + offset, looping on 0 and last
       angle: 0, dialVel: 0, prevDialVel: 0,
@@ -429,6 +481,52 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       pad: Math.max(0, (canvas.width - frames.fw) / 2),
       corners: CORNER_WEIGHTS.map(() => ({ x: 0, y: 0, vx: 0, vy: 0 })),
     });
+
+    state.requestFull = () => {
+      if (state.fullRequested) return;
+      state.fullRequested = true;
+      sheet.src = sheetUrl;
+    };
+    state.preloadPreview = (index, priority = 1) => {
+      if (!state.previews) return Promise.resolve(null);
+      const normalized = wrapFrame(index, state.count);
+      return loadPreview(state.previews, normalized, priority).then((image) => {
+        if (!image) return null;
+        state.previewFrames.set(normalized, image);
+        state.previewRadius = Math.max(state.previewRadius,
+          Math.abs(signedFrameDistance(normalized, state.frameOffset, state.count)));
+        return image;
+      });
+    };
+    state.preloadRange = (radius = 2) => {
+      const loads = [];
+      for (let distance = -radius; distance <= radius; distance += 1) {
+        loads.push(state.preloadPreview(state.frameOffset + distance, 1));
+      }
+      return Promise.all(loads);
+    };
+    state.syncPreview = () => {
+      if (!state.preview || sheet.complete && sheet.naturalWidth) return;
+      let target = wrapFrame(Math.floor(state.frameF), state.count);
+      if (!state.previewFrames.has(target)) {
+        let best = null;
+        let distance = Infinity;
+        for (const index of state.previewFrames.keys()) {
+          const nextDistance = Math.abs(signedFrameDistance(target, index, state.count));
+          if (nextDistance < distance) { best = index; distance = nextDistance; }
+        }
+        target = best;
+      }
+      if (target === null || target === state.previewIndex) return;
+      const image = state.previewFrames.get(target);
+      if (!image) return;
+      state.previewIndex = target;
+      state.preview.src = image.currentSrc || image.src;
+    };
+    // Every earring can paint its rest pose before it asks the network for a
+    // multi-megabyte animation sheet. Visible-grid neighbors queue after the
+    // high-priority rest frame.
+    void state.preloadPreview(frameOffset, 0).then(() => state.syncPreview());
 
     state.syncStrokeColor = () => {
       // Selection owns the color even while hovered; only unselected hover
@@ -477,6 +575,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         state.wiggleDir = -state.wiggleDir;
       }
       state.hovered = true;
+      state.requestFull();
       state.scaleTarget = state.baseScale * HOVER_SCALE;
       state.strokeTarget = STROKE_PX;
       state.syncStrokeColor();
@@ -499,6 +598,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     // the card up: the earring stays put (or returns home), so it's honest.
     state.onDragStart = () => {
       state.hovered = true;
+      state.requestFull();
       state.scaleTarget = state.baseScale * HOVER_SCALE;
       state.strokeTarget = STROKE_PX;
       state.syncStrokeColor();
@@ -533,6 +633,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         (state.hovered || state.mobileFocused ? HOVER_SCALE : 1);
     };
     state.onSelect = () => {
+      state.requestFull();
       state.setSelected(!state.selected);
       if (onSelect) onSelect();
     };
@@ -620,6 +721,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       // png around the hang point; WebGL/canvas render inside is untouched
       const swingTransform = `rotate(${state.swing}rad)`;
       state.canvas.style.transform = swingTransform;
+      if (state.preview) state.preview.style.transform = swingTransform;
       state.hitArea.style.transform = swingTransform;
       // The contact shadow is composited against the stationary grate. Keep
       // its canvas planar so rotating a pendant never rotates that grid mask.
@@ -630,6 +732,19 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       // listing's straight-on frame instead of frame 1.
       state.frameF = (((state.angle / TAU) * state.count + state.frameOffset)
         % state.count + state.count) % state.count;
+      // Before the full sheet exists, dial motion cannot leave the locally
+      // prepared angle ring. It softly rebounds at the frontier instead of
+      // showing a blank or jumping into another animation system.
+      if (!(sheet.complete && sheet.naturalWidth) && state.previewFrames.size) {
+        const delta = signedFrameDistance(state.frameF, state.frameOffset, state.count);
+        const clamped = clamp(delta, -state.previewRadius, state.previewRadius);
+        if (clamped !== delta) {
+          state.angle = (clamped / state.count) * TAU;
+          state.dialVel *= -0.25;
+          state.frameF = wrapFrame(state.frameOffset + clamped, state.count);
+        }
+      }
+      state.syncPreview();
 
       // Stroke width has its own quick physical ease, while its color takes a
       // visible 0.6s cubic ease-out: immediate movement, gentle final settle.
@@ -1001,5 +1116,8 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     }
   }
 
-  return { create, createJelly, destroy, switchKick, nodePoint, nearestNode };
+  const preloadPreview = (previews, frameOffset = 0) =>
+    previews ? loadPreview(previews, frameOffset, 0) : Promise.resolve(null);
+
+  return { create, createJelly, destroy, switchKick, nodePoint, nearestNode, preloadPreview };
 })();

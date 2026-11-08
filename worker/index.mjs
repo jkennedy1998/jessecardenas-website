@@ -1,6 +1,35 @@
 const encoder = new TextEncoder();
 const SESSION_LIFETIME_SECONDS = 30 * 60;
 
+// Auto-link slug map: product-name slug -> graphic key.
+// Generated from source/earrings/graphics.json slugs.
+// A Stripe product whose name slugifies to one of these keys
+// gets that graphicKey automatically — Studio can still override.
+const GRAPHIC_SLUG_MAP = {
+  "bi-chandelier": true, "blue-and-yellow-gummy-bear": true, "blue-chandelier": true,
+  "blue-drop": true, "blue-flower-cluster": true, "blue-raspberry-sugar-coated-meds": true,
+  "blue-wood-drop": true, "bubblegum-sugar-coated-meds": true, "cherry-sugar-coated-meds": true,
+  "clear-star-drop": true, "grape-sugar-coated-meds": true, "green-drop": true,
+  "green-lollipop-cluster": true, "green-puffball": true, "lemon-sugar-coated-meds": true,
+  "nb-chandelier": true, "nb-star-keychain": true, "orange-sugar-coated-meds": true,
+  "orange-three-chain": true, "pan-earring": true, "pink-and-yellow-gummy-worm": true,
+  "pink-chandelier": true, "pink-flower-cluster": true, "pink-polymer-lollipop": true,
+  "purple-lollipop-chandelier": true, "rainbow-chandelier": true, "red-and-yellow-gummy-worm": true,
+  "red-square": true, "red-wood-square-earring": true, "soapy-water-earring": true,
+  "twin-screwpops": true, "yellow-gummy-bear": true, "yellow-triangle": true,
+  "yellow-wood-triangle": true,
+};
+
+// Slugify a product name to match against graphic keys.
+const slugify = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+// Auto-link a Stripe product name to a graphic key via slug matching.
+// Returns the graphic key if there is exactly one match, null otherwise.
+const autoLinkGraphicKey = (productName) => {
+  const slug = slugify(productName);
+  return GRAPHIC_SLUG_MAP[slug] ? slug : null;
+};
+
 // Must match the grate's node map in js/dangle.js (10 wires x 10 rows).
 const BOARD_NODE_COUNT = 90;
 const MAX_LAYOUTS = 50;
@@ -250,7 +279,10 @@ export class InventoryLock {
       // the unit unavailable without it having been sold yet.
       const available = listing.quantity - (reservedByProduct.get(product.id) || 0);
       if (available < 1) continue;
-      listings.push({ ...details, quantity: available, graphicKey: listing.graphicKey, sizePercent: listing.sizePercent || 100, frameOffset: listing.frameOffset || 0 });
+      // Auto-link: if no graphicKey set in Studio, try name->slug matching.
+      const graphicKey = listing.graphicKey || autoLinkGraphicKey(details.title) || '';
+      if (!graphicKey) continue; // skip products that can't be auto-linked or manually mapped
+      listings.push({ ...details, quantity: available, graphicKey, sizePercent: listing.sizePercent || 100, frameOffset: listing.frameOffset || 0 });
     }
     return json({ listings }, 200, { 'cache-control': 'no-store' });
   }
@@ -273,6 +305,8 @@ export class InventoryLock {
       const details = productDetails(product);
       if (!details) continue;
       const listing = await this.state.storage.get(this.listingKey(product.id));
+      // Suggest auto-linked key in Studio when none is set.
+      const suggestedKey = listing?.graphicKey || autoLinkGraphicKey(details.title);
       listings.push({
         ...details,
         quantity: listing?.quantity || 0,
@@ -280,6 +314,7 @@ export class InventoryLock {
         available: Math.max(0, (listing?.quantity || 0) - (reservedByProduct.get(product.id) || 0)),
         published: listing?.published || false,
         graphicKey: listing?.graphicKey || '',
+        suggestedGraphicKey: suggestedKey || undefined,
         sizePercent: listing?.sizePercent || 100,
         frameOffset: listing?.frameOffset || 0,
       });
