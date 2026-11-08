@@ -165,7 +165,17 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
   function loadPreview(previews, index, priority = 1) {
     const url = previewUrl(previews, index);
     const cached = previewCache.get(url);
-    if (cached) return cached.promise;
+    if (cached) {
+      // Catalog-wide posters queue first, then the visible board upgrades its
+      // own posters ahead of the background work. An in-flight request stays
+      // in flight; only an unstarted queue entry is reordered.
+      const queued = previewQueue.find((candidate) => candidate.url === url);
+      if (queued && priority < queued.priority) {
+        queued.priority = priority;
+        previewQueue.sort((left, right) => left.priority - right.priority);
+      }
+      return cached.promise;
+    }
     const image = new Image();
     const entry = { url, image, ready: false, resolve: null, promise: null };
     entry.promise = new Promise((resolve) => { entry.resolve = resolve; });
@@ -498,10 +508,10 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         return image;
       });
     };
-    state.preloadRange = (radius = 2) => {
+    state.preloadRange = (radius = 2, priority = 2) => {
       const loads = [];
       for (let distance = -radius; distance <= radius; distance += 1) {
-        loads.push(state.preloadPreview(state.frameOffset + distance, 1));
+        loads.push(state.preloadPreview(state.frameOffset + distance, priority));
       }
       return Promise.all(loads);
     };
@@ -1116,8 +1126,8 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     }
   }
 
-  const preloadPreview = (previews, frameOffset = 0) =>
-    previews ? loadPreview(previews, frameOffset, 0) : Promise.resolve(null);
+  const preloadPreview = (previews, frameOffset = 0, priority = 1) =>
+    previews ? loadPreview(previews, frameOffset, priority) : Promise.resolve(null);
 
   return { create, createJelly, destroy, switchKick, nodePoint, nearestNode, preloadPreview };
 })();

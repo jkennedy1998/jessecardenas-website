@@ -537,8 +537,8 @@ function buildShopPanel(panel) {
   renderPanel();
 }
 
-async function currentListings() {
-  const response = await fetch(window.SHOP_CONFIG.catalogEndpoint, { cache: "no-store" });
+async function currentListings(signal) {
+  const response = await fetch(window.SHOP_CONFIG.catalogEndpoint, { cache: "no-store", signal });
   const catalog = await response.json().catch(() => ({}));
   if (!response.ok || !Array.isArray(catalog.listings)) {
     throw new Error(catalog.error || "The shop is temporarily unavailable.");
@@ -565,9 +565,9 @@ function showShopStatus(stage, text) {
 // board shows (J's call). /api/layouts is public; an empty/missing list keeps
 // the pre-layouts behavior so the live site never blanks before Jesse saves
 // a first layout in Studio.
-async function currentLayouts() {
+async function currentLayouts(signal) {
   try {
-    const response = await fetch("/api/layouts", { cache: "no-store" });
+    const response = await fetch("/api/layouts", { cache: "no-store", signal });
     const data = await response.json().catch(() => ({}));
     if (response.ok && Array.isArray(data.layouts) && data.layouts.length) return data.layouts;
   } catch {}
@@ -599,12 +599,18 @@ async function initEarringsPage() {
   const stage = document.querySelector(".earring-stage");
   const dots = document.querySelector(".board-dots");
   let entries;
+  const catalogAbort = new AbortController();
+  const catalogTimeout = window.setTimeout(() => catalogAbort.abort(), 12000);
   try {
-    entries = await currentListings();
+    entries = await currentListings(catalogAbort.signal);
   } catch {
+    // The overlay is no longer useful once the actual failure state is ready.
+    // Abort a stalled catalog request rather than leaving someone in a loop.
     showShopStatus(stage, "the shop is temporarily unavailable — please try again soon.");
     loader.reveal();
     return;
+  } finally {
+    window.clearTimeout(catalogTimeout);
   }
   if (!entries.length) {
     if (container) container.innerHTML = '<p class="slice-empty">no earrings listed yet — check back soon.</p>';
@@ -613,7 +619,10 @@ async function initEarringsPage() {
     return;
   }
 
-  const layouts = await currentLayouts();
+  const layoutsAbort = new AbortController();
+  const layoutsTimeout = window.setTimeout(() => layoutsAbort.abort(), 6000);
+  const layouts = await currentLayouts(layoutsAbort.signal);
+  window.clearTimeout(layoutsTimeout);
   let activeIndex = 0;
   let activeJellies = [];
   let hoverCard = null;
@@ -628,10 +637,10 @@ async function initEarringsPage() {
     ? { path: normalizeMediaPath(entry.frames.previewPath), count: entry.frames.count }
     : null;
   // Queue every listing's resting pose before any nearby-angle work. The
-  // overlay waits for this lightweight catalog-wide first paint, not for the
-  // much larger motion sheets.
+  // initial board is allowed to reveal once its own posters arrive; the rest
+  // of the catalog continues this lightweight first-paint pass behind it.
   const posterLoads = entries.map((entry) =>
-    window.Dangle.preloadPreview(previewFor(entry), entry.frameOffset || 0));
+    window.Dangle.preloadPreview(previewFor(entry), entry.frameOffset || 0, 1));
   const restPostersReady = Promise.all(posterLoads);
 
   // Full sheets stay out of the critical path. Once the current board's
@@ -683,6 +692,7 @@ async function initEarringsPage() {
   function mountLayout(layout) {
     window.clearTimeout(idleFullTimer);
     const mountId = ++mountSerial;
+    const visiblePosterLoads = [];
     const nearbyLoads = [];
     for (const { state } of activeJellies) window.Dangle.destroy(state);
     activeJellies = [];
@@ -736,9 +746,12 @@ async function initEarringsPage() {
             else hoverCard?.hide();
           },
         });
-        // Only after every listing's rest poster is queued may this visible
-        // board ask for a small ring of nearby turning angles.
-        nearbyLoads.push(jellyState.preloadRange(2));
+        // Visible rest posters have first claim on the loader handoff; every
+        // other listing still warms behind them at the catalog priority.
+        visiblePosterLoads.push(jellyState.preloadPreview(entry.frameOffset || 0, 0));
+        // Nearby angles wait behind every listing's rest poster, preserving
+        // the all-earrings-first loading order from the brief.
+        nearbyLoads.push(jellyState.preloadRange(2, 2));
         activeJellies.push({ entry, state: jellyState });
         continue;
       }
@@ -753,6 +766,7 @@ async function initEarringsPage() {
     }
     syncSelection();
     warmVisibleFullSheets(mountId, nearbyLoads);
+    return Promise.all(visiblePosterLoads);
   }
 
   // The dot strip: one dot per saved layout, plus the auto selection board
@@ -865,14 +879,13 @@ async function initEarringsPage() {
     }
   }
 
-  mountLayout(layouts[0]);
+  // The loader is for the first view, not for every product in the catalog:
+  // it leaves exactly when this board can appear composed. The catalog-wide
+  // first frames keep arriving immediately behind that handoff.
+  const initialVisiblePostersReady = mountLayout(layouts[0]);
   renderDots();
   window.addEventListener("resize", syncSelection);
-  const loaderFailsafe = window.setTimeout(() => loader.reveal(), 9000);
-  void restPostersReady.then(() => {
-    window.clearTimeout(loaderFailsafe);
-    loader.reveal();
-  });
+  void initialVisiblePostersReady.then(() => loader.reveal());
 
   const panel = document.querySelector(".shop-panel");
   if (panel) buildShopPanel(panel);
