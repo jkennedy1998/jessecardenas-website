@@ -605,13 +605,17 @@ body.has-selection.is-selling-open .shop-panel {
   .earring-stage {
     --board-pane-width: min(92vw, 480px);
     grid-template-columns: var(--board-pane-width) 0px;
-    align-content: start;
+    /* An unselected board is the whole composition, not a header: center it
+       in the available phone viewport rather than pinning it to the top. */
+    align-content: center;
     padding: 1.5rem 1rem;
   }
 
   body.has-selection .earring-stage {
     --pane-width: min(92vw, 480px);
     grid-template-columns: var(--pane-width);
+    /* Once cart detail joins the board the page becomes a vertical flow. */
+    align-content: start;
     gap: 1rem;
   }
 

@@ -27,6 +27,7 @@ window.Dangle = (() => {
   const BREEZE = 0.18; // ambient breeze strength
   const SNAP_PULL = 13; // 1/s, fast approach + ease-out settle onto a node
   const HOVER_SCALE = 1.55; // only the actively hovered/dragged earring grows
+  const MOBILE_FOCUS_SCALE = 2.05; // the active touch selection must show real detail
   const SCALE_EASE = 10; // 1/s, ease for hover scale-up and scale-down
   const BOARD_REFERENCE_WIDTH = 780; // CSS px: the grate's full desktop width
   const BASE_DEPTH_RANGE = 9; // lower-hanging earrings render in front
@@ -338,7 +339,9 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       // Selection retains its outline only; size belongs to the hovered or
       // currently focused item.
       state.scaleTarget = state.baseScale *
-        (state.hovered || state.mobileFocused ? (state.hoverScale || HOVER_SCALE) : 1);
+        (state.hovered || state.mobileFocused
+          ? (state.mobileFocused ? MOBILE_FOCUS_SCALE : (state.hoverScale || HOVER_SCALE))
+          : 1);
       state.strokeTarget = state.selected || state.hovered ? STROKE_PX : 0;
       if (releaseExtra) releaseExtra();
     };
@@ -650,16 +653,16 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       state.selected = value;
       state.strokeTarget = value || state.hovered ? STROKE_PX : 0;
       state.scaleTarget = state.baseScale *
-        (state.hovered || state.mobileFocused ? HOVER_SCALE : 1);
+        (state.mobileFocused ? MOBILE_FOCUS_SCALE : (state.hovered ? HOVER_SCALE : 1));
       state.syncStrokeColor();
     };
     // Cart selection and mobile visual focus are related but distinct: every
     // selected earring keeps its outline, while only the latest selection
-    // grows to make the active choice unmistakable.
+    // grows to a much more legible touch-first product scale.
     state.setMobileFocused = (value) => {
       state.mobileFocused = value;
       state.scaleTarget = state.baseScale *
-        (state.hovered || state.mobileFocused ? HOVER_SCALE : 1);
+        (state.mobileFocused ? MOBILE_FOCUS_SCALE : (state.hovered ? HOVER_SCALE : 1));
     };
     state.onSelect = () => {
       state.requestFull();
