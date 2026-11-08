@@ -24,3 +24,7 @@
 ### 2026-11-08T14:09Z-mobile-board-position-motion
 - j-quote: "It clips location it should slide eased in both directions ideally."
 - interpretation: changing between the vertically centered empty-board composition and the top-aligned cart flow must animate along the actual measured route on both entering and leaving selection, rather than clipping between layout states.
+
+### 2026-11-08T14:16Z-mobile-card-during-board-motion
+- j-quote: "I notice if the screen is moving the text box doesn't get created in the right spot. Once screen settles it is in the right spot for the text box next to the Earing -- but only on new eating text boxes. The text box created when the Earing is being selected is created and stays at the wrong y height"
+- interpretation: a mobile detail card created during the board's layout glide must track the board's live visual bounds until motion completes, so the initial selected earring card does not retain a pre-settle vertical coordinate.

@@ -213,13 +213,15 @@ function buildEarringHoverCard(stage) {
   stage.append(card);
 
   let activeState = null;
+  let positionTrackFrame = null;
   const place = (state) => {
     const boardRect = state.hang.getBoundingClientRect();
     // Anchor off the earring's resting home node and its base (un-hovered)
     // scale — never live x/y, dial angle, or the hover scale-up — so the
     // card holds still while the earring spins, jiggles, or grows under the
-    // pointer. It only moves again when the hover target changes or the
-    // earring is actually dropped on a new node.
+    // pointer. It only moves again when the hover target changes, the
+    // earring is actually dropped on a new node, or the whole board changes
+    // screen position during the mobile cart transition.
     const home = state.home;
     const scale = state.baseScale;
     const earringWidth = state.fw * scale;
@@ -247,6 +249,31 @@ function buildEarringHoverCard(stage) {
     const top = centerY - cardHeight / 2;
     card.style.top = `${Math.max(12, Math.min(top, window.innerHeight - cardHeight - 12))}px`;
     card.style.setProperty("--card-slide-x", `${wantsRight ? -earringWidth / 2 : earringWidth / 2}px`);
+  };
+
+  const stopPositionTracking = () => {
+    if (positionTrackFrame !== null) cancelAnimationFrame(positionTrackFrame);
+    positionTrackFrame = null;
+  };
+  const trackMovingBoard = (state) => {
+    // The mobile board may still be gliding from its centered empty state to
+    // the cart flow when this fixed-position card is created. Its DOM rect
+    // includes that transform, so follow it through the short glide instead
+    // of pinning the card to the first, pre-settle measurement.
+    if (!window.matchMedia("(max-width: 900px)").matches) return;
+    stopPositionTracking();
+    const until = performance.now() + 700;
+    const tick = () => {
+      if (activeState !== state || !card.classList.contains("is-active")) {
+        positionTrackFrame = null;
+        return;
+      }
+      place(state);
+      positionTrackFrame = performance.now() < until
+        ? requestAnimationFrame(tick)
+        : null;
+    };
+    positionTrackFrame = requestAnimationFrame(tick);
   };
 
   window.addEventListener("resize", () => {
@@ -278,9 +305,11 @@ function buildEarringHoverCard(stage) {
       card.classList.toggle("is-selected", window.Shop.has(entry.productId));
       if (changedEarring || justReleased) place(state);
       card.classList.add("is-active");
+      if (changedEarring) trackMovingBoard(state);
     },
     hide() {
       activeState = null;
+      stopPositionTracking();
       card.classList.remove("is-active");
     },
   };
