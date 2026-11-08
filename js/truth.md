@@ -48,3 +48,7 @@
 ### 2026-11-08T14:49Z-soften-selection-turn
 - j-quote: "It looks too strong now, let's make it less strong"
 - interpretation: preserve the reliable full-canvas selection turn, but soften its randomized visual range to 14–22% of the sequence and lengthen it slightly for a calmer invitation.
+
+### 2026-11-08T14:53Z-slower-selection-turn
+- j-quote: "Slow it doesn't even more for the impulse please. Maybe 60 percent of current"
+- interpretation: use 60% of the current selection-turn angular speed by extending the randomized turn duration from 520–820ms to 870–1370ms, without reducing the visible turn range.

@@ -81,8 +81,9 @@ const SELECTED_PULSE_START_JITTER = 1200;
 // to ±2 frames before the full sheet arrives.
 const SELECTED_TURN_MIN_RAD = 0.85; // 14% of the sequence: clear, not forceful
 const SELECTED_TURN_MAX_RAD = 1.4; // 22%, with enough variance to feel alive
-const SELECTED_TURN_MIN_MS = 520;
-const SELECTED_TURN_MAX_MS = 820;
+// 60% of the prior angular speed: retain the visible turn, let it breathe.
+const SELECTED_TURN_MIN_MS = 870;
+const SELECTED_TURN_MAX_MS = 1370;
 const SELECTED_PULSE_GAP_MIN = 2800;
 const SELECTED_PULSE_GAP_MAX = 6200;
 const HOVER_KICK = 9; // rad/s, wiggle impulse on hover
