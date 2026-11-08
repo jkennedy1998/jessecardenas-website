@@ -479,6 +479,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       frameOffset,
       previews: previews ? { path: previews.path, count: frames.count } : null,
       previewFrames: new Map(), previewRadius: 0, previewIndex: null,
+      previewRetired: false, previewHandoffPending: false,
       fullRequested: false,
       // dial state: angle (rad, unbounded) maps onto the sequence —
       // frameF = angle/TAU * count + offset, looping on 0 and last
@@ -492,6 +493,23 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       corners: CORNER_WEIGHTS.map(() => ({ x: 0, y: 0, vx: 0, vy: 0 })),
     });
 
+    // The preview is a short-lived lightweight poster, not a second visual
+    // renderer. The sheet takes over only after its first canvas frame has
+    // painted, then the poster fades out and is removed from the DOM.
+    sheet.addEventListener("load", () => {
+      state.previewHandoffPending = Boolean(state.preview && !state.previewRetired);
+    });
+    state.retirePreview = () => {
+      if (!state.preview || state.previewRetired) return;
+      state.previewRetired = true;
+      const image = state.preview;
+      image.classList.add("is-retired");
+      window.setTimeout(() => {
+        if (state.preview !== image) return;
+        image.remove();
+        state.preview = null;
+      }, 240);
+    };
     state.requestFull = () => {
       if (state.fullRequested) return;
       state.fullRequested = true;
@@ -754,6 +772,15 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
           state.frameF = wrapFrame(state.frameOffset + clamped, state.count);
         }
       }
+      // The first full-sheet canvas frame deliberately matches the rest
+      // poster. That makes the renderer handoff visually continuous instead
+      // of showing two differently rotated earrings for a beat.
+      if (state.previewHandoffPending) {
+        state.angle = 0;
+        state.dialVel = 0;
+        state.prevDialVel = 0;
+        state.frameF = state.frameOffset;
+      }
       state.syncPreview();
 
       // Stroke width has its own quick physical ease, while its color takes a
@@ -800,7 +827,18 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       // the frames used to play linearly while dragging; now the dial owns
       // them — drag yanks kick the dial above, so the piece turns as you move it
 
-      drawJelly(state);
+      if (state.previewHandoffPending) {
+        // The preview has no quad deformation. Zero the canvas deformation for
+        // its first painted frame so the overlap is pixel-for-pixel stable.
+        for (const corner of state.corners) {
+          corner.x = 0; corner.y = 0; corner.vx = 0; corner.vy = 0;
+        }
+      }
+      const painted = drawJelly(state);
+      if (state.previewHandoffPending && painted) {
+        state.previewHandoffPending = false;
+        state.retirePreview();
+      }
       if (state.shadow) drawShadow(state);
       state.renderPivot();
       // Same rule every frame: the card stays up while the earring stays
@@ -826,7 +864,10 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
     // frame's draw instead — whatever was already painted stays on screen —
     // and let the next frame retry rather than giving up for good.
     try {
-      if (state.draw && !state.draw.failed) { state.draw(state); return; }
+      if (state.draw && !state.draw.failed) {
+        state.draw(state);
+        return !state.draw.failed;
+      }
       if (state.draw && state.draw.failed && !state.ctx) {
         // WebGL tainted the canvas (file:// pages) — a 2D context can't be
         // created on it, so swap in a clean canvas and continue on the 2D path.
@@ -849,11 +890,13 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
         }
       }
       drawJelly2D(state);
+      return true;
     } catch (err) {
       if (!state.drawErrorLogged) {
         console.error("[dangle] drawJelly failed, skipping frames until it recovers:", err);
         state.drawErrorLogged = true;
       }
+      return false;
     }
   }
 

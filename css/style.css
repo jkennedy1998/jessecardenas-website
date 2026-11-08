@@ -379,7 +379,13 @@ main { flex: 1; }
   z-index: 2;
   object-fit: fill;
   image-rendering: auto;
+  opacity: 1;
+  transition: opacity 180ms ease-out;
 }
+
+/* Once the full canvas has painted its matching rest frame, the temporary
+   poster leaves entirely. The earring is never permanently double-rendered. */
+.earring-jelly-preview.is-retired { opacity: 0; }
 
 /* A deliberately narrower interaction plane follows the sprite without
    turning its transparent canvas margins into clickable neighboring items. */
