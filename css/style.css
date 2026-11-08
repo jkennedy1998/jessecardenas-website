@@ -70,24 +70,31 @@ main { flex: 1; }
   display: inline-block;
   min-width: 0.22em;
   color: #d26de8;
-  animation: shop-loading-weight 3.6s steps(4, end) infinite,
-    shop-loading-color 5.3s ease-in-out infinite alternate;
+  /* Two independent traveling peaks. The weight crest advances one letter
+     every .2s, while the purple crest travels at a different cadence, so the
+     loop reads as a living word rather than a synchronized type effect. */
+  animation: shop-loading-weight-wave 3.6s steps(4, end) infinite,
+    shop-loading-color-wave 5.27s ease-in-out infinite;
   animation-delay: calc(var(--letter-index) * -0.2s), calc(var(--letter-index) * -0.31s);
+  will-change: color, font-weight;
 }
 
 .shop-loading-letter.is-space { min-width: 0.28em; }
 
-@keyframes shop-loading-weight {
-  0%, 100% { font-weight: 300; }
-  25% { font-weight: 400; }
-  50% { font-weight: 600; }
-  75% { font-weight: 700; }
+@keyframes shop-loading-weight-wave {
+  0%, 32%, 100% { font-weight: 300; }
+  38% { font-weight: 400; }
+  44%, 54% { font-weight: 700; }
+  60% { font-weight: 600; }
+  66% { font-weight: 400; }
 }
 
-@keyframes shop-loading-color {
-  0% { color: #edb8f7; }
-  50% { color: #d26de8; }
-  100% { color: #a036dd; }
+@keyframes shop-loading-color-wave {
+  0%, 34%, 100% { color: #edb8f7; }
+  41% { color: #d26de8; }
+  48%, 54% { color: #a036dd; }
+  61% { color: #d26de8; }
+  68% { color: #edb8f7; }
 }
 
 @media (prefers-reduced-motion: reduce) {

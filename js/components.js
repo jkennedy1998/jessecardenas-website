@@ -55,6 +55,7 @@ function createShopLoader() {
   const screen = document.querySelector(".shop-loading");
   const title = screen?.querySelector(".shop-loading-title");
   const openedAt = performance.now();
+  let revealed = false;
   if (title) {
     const text = title.textContent;
     title.replaceChildren(...[...text].map((character, index) => {
@@ -68,7 +69,11 @@ function createShopLoader() {
   }
   return {
     reveal() {
-      if (!screen) return;
+      // The rest-pose promise and the network safety timer race deliberately.
+      // Only the first caller may start the exit, keeping slow/offline visits
+      // from trapping someone behind an otherwise beautiful loader.
+      if (!screen || revealed) return;
+      revealed = true;
       const delay = Math.max(0, 550 - (performance.now() - openedAt));
       window.setTimeout(() => screen.classList.add("is-ready"), delay);
     },
@@ -615,6 +620,8 @@ async function initEarringsPage() {
   const isCompactLayout = () => window.matchMedia("(max-width: 900px)").matches;
   let lastSelectedProductId = null;
   let switching = false;
+  let idleFullTimer = null;
+  let mountSerial = 0;
 
   const byProduct = () => new Map(entries.map((entry) => [entry.productId, entry]));
   const previewFor = (entry) => entry.frames?.previewPath
@@ -625,6 +632,34 @@ async function initEarringsPage() {
   // much larger motion sheets.
   const posterLoads = entries.map((entry) =>
     window.Dangle.preloadPreview(previewFor(entry), entry.frameOffset || 0));
+  const restPostersReady = Promise.all(posterLoads);
+
+  // Full sheets stay out of the critical path. Once the current board's
+  // nearby-angle ring is ready, a quiet connection can warm those sheets one
+  // at a time; hover/tap/drag always beats this timer. Data saver, 2G, and
+  // reduced-motion visitors keep the deliberate poster-only experience until
+  // they explicitly interact.
+  const shouldWarmFullSheets = () => {
+    const connection = navigator.connection;
+    return !connection?.saveData && !["slow-2g", "2g"].includes(connection?.effectiveType) &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  };
+  function warmVisibleFullSheets(mountId, nearbyLoads) {
+    if (!shouldWarmFullSheets() || !nearbyLoads.length) return;
+    void Promise.all([restPostersReady, Promise.all(nearbyLoads)]).then(() => {
+      if (mountId !== mountSerial) return;
+      const requestNext = (index = 0) => {
+        if (mountId !== mountSerial) return;
+        activeJellies[index]?.state.requestFull?.();
+        if (index + 1 < activeJellies.length) {
+          idleFullTimer = window.setTimeout(() => requestNext(index + 1), 900);
+        }
+      };
+      // Let the composed board have a small, calm moment before it starts
+      // filling in the expensive continuous rotations behind the scenes.
+      idleFullTimer = window.setTimeout(requestNext, 1800);
+    });
+  }
 
   // One layout -> the entries it displays. Saved layouts carry productId/node
   // pairs; unavailable earrings drop out and their slot goes empty. The
@@ -646,6 +681,9 @@ async function initEarringsPage() {
   }
 
   function mountLayout(layout) {
+    window.clearTimeout(idleFullTimer);
+    const mountId = ++mountSerial;
+    const nearbyLoads = [];
     for (const { state } of activeJellies) window.Dangle.destroy(state);
     activeJellies = [];
     board.replaceChildren();
@@ -700,7 +738,7 @@ async function initEarringsPage() {
         });
         // Only after every listing's rest poster is queued may this visible
         // board ask for a small ring of nearby turning angles.
-        void jellyState.preloadRange(2);
+        nearbyLoads.push(jellyState.preloadRange(2));
         activeJellies.push({ entry, state: jellyState });
         continue;
       }
@@ -714,6 +752,7 @@ async function initEarringsPage() {
       window.Dangle.create(dangle, { node: entry.node, scale: 0.35, length: 280 });
     }
     syncSelection();
+    warmVisibleFullSheets(mountId, nearbyLoads);
   }
 
   // The dot strip: one dot per saved layout, plus the auto selection board
@@ -829,7 +868,11 @@ async function initEarringsPage() {
   mountLayout(layouts[0]);
   renderDots();
   window.addEventListener("resize", syncSelection);
-  void Promise.all(posterLoads).then(() => loader.reveal());
+  const loaderFailsafe = window.setTimeout(() => loader.reveal(), 9000);
+  void restPostersReady.then(() => {
+    window.clearTimeout(loaderFailsafe);
+    loader.reveal();
+  });
 
   const panel = document.querySelector(".shop-panel");
   if (panel) buildShopPanel(panel);
