@@ -32,3 +32,7 @@
 ### 2026-11-08T14:24Z-selected-earring-idle-pulses
 - j-quote: "Let's make it so selected earings spin slowly and nicely when the user has them selected but the user has not dragged them in the last 5 seconds. This should happen on selected as well so each Earing spins a little bit ideally with a pulse in a random direction and random strength."
 - interpretation: each cart-selected earring independently waits five seconds after direct manipulation, then gives its frame-sequence dial small randomized direction/strength impulses at an irregular cadence. Interaction resets the quiet timer; reduced-motion visitors receive no autonomous pulses.
+
+### 2026-11-08T14:31Z-selection-opening-turn
+- j-quote: "It should ideally happen on the tap that selects the Earing too so that it pulls the user to rotate it / shows them the Earing in 3d without needing them to do anything. Also I notice that it's kind of a little rotation . Let's increase it's overall force by 2"
+- interpretation: a new selection triggers a randomized opening turn as soon as the full-sheet canvas safely owns the render, inviting manual rotation; selected-turn impulses use exactly double the prior force range while subsequent idle turns retain their independent cadence.

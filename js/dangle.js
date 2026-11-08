@@ -76,8 +76,8 @@ const DIAL_V_MAX = 15; // rad/s, dial velocity cap
 // cart reads like several living earrings, never a synchronized carousel.
 const SELECTED_IDLE_MS = 5000;
 const SELECTED_PULSE_START_JITTER = 1200;
-const SELECTED_PULSE_MIN = 1.4; // rad/s impulse — visibly turns, never whips
-const SELECTED_PULSE_MAX = 3;
+const SELECTED_PULSE_MIN = 2.8; // rad/s impulse — 2x the original turn force
+const SELECTED_PULSE_MAX = 6;
 const SELECTED_PULSE_GAP_MIN = 2800;
 const SELECTED_PULSE_GAP_MAX = 6200;
 const HOVER_KICK = 9; // rad/s, wiggle impulse on hover
@@ -498,6 +498,9 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       previewFrames: new Map(), previewRadius: 0, previewIndex: null,
       previewRetired: false, previewHandoffPending: false,
       fullRequested: false,
+      // Selection attraction waits for the first full-sheet canvas paint so
+      // the poster-to-canvas handoff cannot cancel its opening turn.
+      selectionPulsePending: false,
       // Selected turns are deferred from the most recent direct touch/drag.
       lastManualTurnAt: performance.now(), nextSelectedPulseAt: Infinity,
       // dial state: angle (rad, unbounded) maps onto the sequence —
@@ -540,6 +543,17 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       // so a multi-item selection does not wake up in lockstep.
       if (state.selected) state.nextSelectedPulseAt = at + SELECTED_IDLE_MS +
         Math.random() * SELECTED_PULSE_START_JITTER;
+    };
+    state.pulseSelectedTurn = (preserveNextPulse = false) => {
+      if (REDUCED || !state.selected) return;
+      const direction = Math.random() < 0.5 ? -1 : 1;
+      const strength = SELECTED_PULSE_MIN + Math.random() *
+        (SELECTED_PULSE_MAX - SELECTED_PULSE_MIN);
+      state.dialVel = clamp(state.dialVel + direction * strength, -DIAL_V_MAX, DIAL_V_MAX);
+      if (!preserveNextPulse) {
+        state.nextSelectedPulseAt = performance.now() + SELECTED_PULSE_GAP_MIN + Math.random() *
+          (SELECTED_PULSE_GAP_MAX - SELECTED_PULSE_GAP_MIN);
+      }
     };
     state.preloadPreview = (index, priority = 1) => {
       if (!state.previews) return Promise.resolve(null);
@@ -675,11 +689,17 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       const changed = state.selected !== value;
       state.selected = value;
       if (changed && value) {
-        // A cart selection is direct intent: prepare its full turn sequence,
-        // then give it at least five quiet seconds before its first pulse.
+        // A cart selection is direct intent: prepare the 3D sequence and use
+        // a strong opening turn as an invitation to explore it further.
         state.requestFull();
         state.noteManualTurn();
+        if (sheet.complete && sheet.naturalWidth && !state.previewHandoffPending) {
+          state.pulseSelectedTurn(true);
+        } else {
+          state.selectionPulsePending = true;
+        }
       } else if (!value) {
+        state.selectionPulsePending = false;
         state.nextSelectedPulseAt = Infinity;
       }
       state.strokeTarget = value || state.hovered ? STROKE_PX : 0;
@@ -745,12 +765,7 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       if (!REDUCED && state.selected && !state.hovered && !state.dragging &&
         !state.mobileGesture && now - state.lastManualTurnAt >= SELECTED_IDLE_MS &&
         now >= state.nextSelectedPulseAt) {
-        const direction = Math.random() < 0.5 ? -1 : 1;
-        const strength = SELECTED_PULSE_MIN + Math.random() *
-          (SELECTED_PULSE_MAX - SELECTED_PULSE_MIN);
-        state.dialVel += direction * strength;
-        state.nextSelectedPulseAt = now + SELECTED_PULSE_GAP_MIN + Math.random() *
-          (SELECTED_PULSE_GAP_MAX - SELECTED_PULSE_GAP_MIN);
+        state.pulseSelectedTurn();
       }
       state.dialVel += (-springK * Math.sin(state.angle)) * dt;
       state.dialVel -= state.dialVel * DIAL_DAMP * dt;
@@ -883,6 +898,13 @@ const SHADOW_PAD = 16; // sprite margin so blur + offset never clip
       if (state.previewHandoffPending && painted) {
         state.previewHandoffPending = false;
         state.retirePreview();
+      }
+      if (state.selectionPulsePending && painted && sheet.complete && sheet.naturalWidth &&
+        !state.previewHandoffPending) {
+        state.selectionPulsePending = false;
+        // The handoff's rest-frame draw just completed. Start the opening
+        // invitation on the following frame, now owned solely by the canvas.
+        state.pulseSelectedTurn(true);
       }
       if (state.shadow) drawShadow(state);
       state.renderPivot();
