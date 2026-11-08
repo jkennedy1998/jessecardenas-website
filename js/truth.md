@@ -20,3 +20,7 @@
 ### 2026-11-08T14:03Z-mobile-centering-and-shorter-loader
 - j-quote: "I didn't see the grid vertically alligned to center when nothing is selected but I saw it get horizontally moved (weirdly) when nothing was selected. Might of swapped coordinates...\n\nIntro screen looks better. Let's make it 60 percent of its current length minimum"
 - interpretation: the unselected phone board needs explicit two-axis viewport centering without an offset from the collapsed cart track. Scale the complete fast-load intro timing (hold, settle, and fade) to 60% while retaining the decelerated exit.
+
+### 2026-11-08T14:09Z-mobile-board-position-motion
+- j-quote: "It clips location it should slide eased in both directions ideally."
+- interpretation: changing between the vertically centered empty-board composition and the top-aligned cart flow must animate along the actual measured route on both entering and leaving selection, rather than clipping between layout states.

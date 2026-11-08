@@ -472,6 +472,38 @@ function buildShopPanel(panel) {
 
   let panelCloseTimer = null;
   let panelOpenFrame = null;
+  let boardMotion = null;
+  const mobileBoardRect = () => window.matchMedia("(max-width: 900px)").matches
+    ? document.querySelector(".board-pane")?.getBoundingClientRect()
+    : null;
+  const glideMobileBoard = (first) => {
+    if (!first || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const pane = document.querySelector(".board-pane");
+    const last = pane?.getBoundingClientRect();
+    if (!pane || !last) return;
+    const dx = first.left - last.left;
+    const dy = first.top - last.top;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+    boardMotion?.cancel();
+    // FLIP the board between its centered empty state and its cart-flow
+    // position. Layout changes immediately for accessibility; this only gives
+    // the eye a continuous, reversible eased path between the two locations.
+    const motion = pane.animate([
+      { transform: `translate3d(${dx}px, ${dy}px, 0)` },
+      { transform: "translate3d(0, 0, 0)" },
+    ], {
+      duration: 620,
+      easing: "cubic-bezier(0.22, 0.8, 0.24, 1)",
+      fill: "both",
+    });
+    boardMotion = motion;
+    motion.addEventListener("finish", () => {
+      if (boardMotion === motion) boardMotion = null;
+      // The final transform is identity; clearing the filled animation keeps
+      // repeated add/remove cycles from accumulating finished animations.
+      motion.cancel();
+    }, { once: true });
+  };
 
   function renderPanel() {
     const state = window.Shop.summary();
@@ -483,7 +515,9 @@ function buildShopPanel(panel) {
         document.body.classList.remove("is-selling-open");
         clearTimeout(panelCloseTimer);
         panelCloseTimer = window.setTimeout(() => {
+          const boardBefore = mobileBoardRect();
           document.body.classList.remove("has-selection");
+          glideMobileBoard(boardBefore);
           list.replaceChildren();
           total.textContent = "";
           checkout.disabled = true;
@@ -497,7 +531,9 @@ function buildShopPanel(panel) {
     }
     clearTimeout(panelCloseTimer);
     if (!document.body.classList.contains("has-selection")) {
+      const boardBefore = mobileBoardRect();
       document.body.classList.add("has-selection");
+      glideMobileBoard(boardBefore);
       cancelAnimationFrame(panelOpenFrame);
       panelOpenFrame = requestAnimationFrame(() =>
         document.body.classList.add("is-selling-open"));
