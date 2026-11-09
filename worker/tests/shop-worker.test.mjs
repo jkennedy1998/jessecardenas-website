@@ -145,7 +145,7 @@ test('Studio publishes Product-ID inventory; checkout holds, payment decrements'
     assert.deepEqual(catalog.listings[0], {
       productId: 'prod_purple', title: 'Purple lollypop', description: 'Glass candy.',
       materials: 'glass', price: 52, currency: 'usd', priceId: 'price_purple', active: true,
-      image: '', quantity: 2, graphicKey: 'purple-lollypop', sizePercent: 105, frameOffset: 3,
+      image: '', quantity: 2, graphicKey: 'purple-lollypop', colorKey: 'purple', sizePercent: 105, frameOffset: 3,
     });
 
     const checkout = await lock.fetch(new Request('https://jessecardenas.com/api/checkout', {
@@ -187,7 +187,7 @@ test('Studio publishes Product-ID inventory; checkout holds, payment decrements'
   }
 });
 
-test('published listings auto-link an approved graphic from their Stripe product name', { concurrency: false }, async () => {
+test('published listings auto-link an approved graphic and accent color from their Stripe product name', { concurrency: false }, async () => {
   const { storage } = memoryStorage();
   const originalFetch = globalThis.fetch;
   const blueChandelier = {
@@ -210,8 +210,18 @@ test('published listings auto-link an approved graphic from their Stripe product
 
     const catalog = await (await lock.fetch(new Request('https://jessecardenas.com/api/catalog'))).json();
     assert.equal(catalog.listings[0].graphicKey, 'blue-chandelier');
+    assert.equal(catalog.listings[0].colorKey, 'bluie');
     const studio = await (await lock.fetch(new Request('https://jessecardenas.com/api/studio/listings'))).json();
     assert.equal(studio.listings[0].suggestedGraphicKey, 'blue-chandelier');
+    assert.equal(studio.listings[0].suggestedColorKey, 'bluie');
+
+    // Jesse's saved colorKey overrides the name-parsed suggestion.
+    await lock.fetch(new Request('https://jessecardenas.com/api/studio/listings/prod_blue_chandelier', {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ quantity: 1, graphicKey: 'blue-chandelier', colorKey: 'purple', published: true }),
+    }));
+    const overridden = await (await lock.fetch(new Request('https://jessecardenas.com/api/catalog'))).json();
+    assert.equal(overridden.listings[0].colorKey, 'purple');
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -51,6 +51,24 @@ function normalizeMediaPath(file) {
   return ROOT + String(file).replace(/^\/+/, "");
 }
 
+// Shrinks the loading title's font until it fits the screen's padded width
+// on one line. The CSS clamp() already scales it down with viewport width,
+// but narrow phones can still be tighter than the clamp's floor allows —
+// this is the hard guarantee that catches those cases.
+function fitLoaderTitleToOneLine(screen, title) {
+  if (!screen || !title) return;
+  title.style.fontSize = "";
+  const screenStyle = getComputedStyle(screen);
+  const available = screen.clientWidth
+    - Number.parseFloat(screenStyle.paddingLeft) - Number.parseFloat(screenStyle.paddingRight);
+  const needed = title.scrollWidth;
+  if (available <= 0 || needed <= available) return;
+  const current = Number.parseFloat(getComputedStyle(title).fontSize);
+  // A small safety margin absorbs the per-letter weight animation briefly
+  // widening a character past its resting width.
+  title.style.fontSize = `${current * (available / needed) * 0.97}px`;
+}
+
 function createShopLoader() {
   const screen = document.querySelector(".shop-loading");
   const title = screen?.querySelector(".shop-loading-title");
@@ -58,6 +76,7 @@ function createShopLoader() {
   const minimumDuration = 1920;
   const settleDuration = 420;
   let revealed = false;
+  let fit = null;
   if (title) {
     const text = title.textContent;
     title.replaceChildren(...[...text].map((character, index) => {
@@ -68,6 +87,10 @@ function createShopLoader() {
       letter.textContent = character === " " ? " " : character;
       return letter;
     }));
+    fit = () => fitLoaderTitleToOneLine(screen, title);
+    fit();
+    document.fonts?.ready?.then(fit);
+    window.addEventListener("resize", fit);
   }
   const slowWaveForExit = () => {
     const animations = title?.getAnimations?.({ subtree: true }) || [];
@@ -86,6 +109,7 @@ function createShopLoader() {
       // then the live wave slows into the page reveal once the board is ready.
       if (!screen || revealed) return;
       revealed = true;
+      if (fit) window.removeEventListener("resize", fit);
       const delay = Math.max(0, minimumDuration - (performance.now() - openedAt));
       window.setTimeout(() => {
         screen.classList.add("is-settling");
@@ -631,7 +655,10 @@ async function currentListings(signal) {
       console.warn(`[shop] no graphic mapped for Stripe product: ${listing.productId}`);
       return [];
     }
-    return [{ ...listing, ...visual }];
+    // colorKey is Jesse's per-listing override of the graphic's baked-in
+    // accent color; an unset colorKey keeps the graphic's own color.
+    const colors = listing.colorKey ? { accent: listing.colorKey } : visual.colors;
+    return [{ ...listing, ...visual, colors }];
   });
 }
 

@@ -4,6 +4,7 @@ window.Studio = (() => {
   const status = document.querySelector('.studio-status');
   const list = document.querySelector('.studio-list');
   const graphics = window.EARRING_VISUALS || {};
+  const palette = window.EARRING_COLOR_PALETTE || {};
   const sheetCache = new Map();
 
   const setStatus = (message, isError = false) => {
@@ -87,10 +88,22 @@ window.Studio = (() => {
     // can still choose any other approved treatment before publishing.
     const selectedGraphicKey = listing.graphicKey || listing.suggestedGraphicKey || '';
     graphic.append(option('', 'choose a prepared graphic', selectedGraphicKey));
-    for (const [key, visual] of Object.entries(graphics)) {
+    for (const [key, visual] of Object.entries(graphics).sort(([, a], [, b]) => a.slug.localeCompare(b.slug))) {
       graphic.append(option(key, visual.slug, selectedGraphicKey));
     }
     graphicLabel.append(graphic);
+
+    const colorLabel = document.createElement('label');
+    colorLabel.textContent = 'accent color';
+    const color = document.createElement('select');
+    // The name-parsed color word starts selected (e.g. "Red square" ->
+    // red); an empty choice keeps the graphic's own baked-in color.
+    const selectedColorKey = listing.colorKey || listing.suggestedColorKey || '';
+    color.append(option('', 'use the graphic color', selectedColorKey));
+    for (const key of Object.keys(palette).sort((a, b) => a.localeCompare(b))) {
+      color.append(option(key, key, selectedColorKey));
+    }
+    colorLabel.append(color);
 
     const sizeLabel = document.createElement('label');
     sizeLabel.textContent = 'size on board (5% steps)';
@@ -178,6 +191,7 @@ window.Studio = (() => {
           body: JSON.stringify({
             quantity: Number(stock.value),
             graphicKey: graphic.value,
+            colorKey: color.value,
             published: published.checked,
             sizePercent,
             frameOffset,
@@ -200,7 +214,7 @@ window.Studio = (() => {
     previewRow.className = 'studio-previews';
     previewRow.append(thumb, framePreview);
 
-    card.append(heading, previewRow, detail, stockLabel, graphicLabel, sizeLabel,
+    card.append(heading, previewRow, detail, stockLabel, graphicLabel, colorLabel, sizeLabel,
       frameLabel, publishLabel, held, save);
     return card;
   }
@@ -212,7 +226,8 @@ window.Studio = (() => {
       if (!response.ok || !Array.isArray(result.listings)) {
         throw new Error(result.error || 'Could not load Stripe products.');
       }
-      list.replaceChildren(...result.listings.map(cardFor));
+      const sorted = result.listings.slice().sort((a, b) => a.title.localeCompare(b.title));
+      list.replaceChildren(...sorted.map(cardFor));
       setStatus(result.listings.length ? '' : 'No Stripe Products yet.');
     } catch (cause) {
       setStatus(cause.message || 'Could not load Studio.', true);

@@ -84,7 +84,9 @@ window.StudioLayouts = (() => {
     drawFrameThumb(listing, (dataUrl) => { img.src = dataUrl; });
   }
 
-  const availableListings = () => listings.filter((listing) => listing.available >= 1);
+  const availableListings = () => listings
+    .filter((listing) => listing.available >= 1)
+    .sort((a, b) => a.title.localeCompare(b.title));
   const listingFor = (productId) => listings.find((listing) => listing.productId === productId);
 
   // First grid node not already claimed in the buffer, in reading order.

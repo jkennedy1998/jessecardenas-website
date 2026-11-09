@@ -30,6 +30,25 @@ const autoLinkGraphicKey = (productName) => {
   return GRAPHIC_SLUG_MAP[slug] ? slug : null;
 };
 
+// Must match the family keys in source/earrings/palette.json.
+const PALETTE_FAMILIES = new Set(['yellow', 'orange', 'red', 'violet', 'purple', 'bluie', 'green']);
+
+// Color words a Stripe product name may use -> palette family. "pink" reads
+// closest to the violet family's hex range, so it maps there.
+const COLOR_WORD_TO_FAMILY = {
+  red: 'red', orange: 'orange', yellow: 'yellow', green: 'green',
+  blue: 'bluie', purple: 'purple', violet: 'violet', pink: 'violet',
+};
+
+// Auto-link a Stripe product name to a preset color family via word matching.
+// Returns the first color word found, null otherwise. Studio can still override.
+const autoLinkColorKey = (productName) => {
+  for (const word of productName.toLowerCase().split(/[^a-z]+/)) {
+    if (COLOR_WORD_TO_FAMILY[word]) return COLOR_WORD_TO_FAMILY[word];
+  }
+  return null;
+};
+
 // Must match the grate's node map in js/dangle.js (10 wires x 10 rows).
 const BOARD_NODE_COUNT = 90;
 const MAX_LAYOUTS = 50;
@@ -282,7 +301,12 @@ export class InventoryLock {
       // Auto-link: if no graphicKey set in Studio, try name->slug matching.
       const graphicKey = listing.graphicKey || autoLinkGraphicKey(details.title) || '';
       if (!graphicKey) continue; // skip products that can't be auto-linked or manually mapped
-      listings.push({ ...details, quantity: available, graphicKey, sizePercent: listing.sizePercent || 100, frameOffset: listing.frameOffset || 0 });
+      // Auto-link: if no colorKey set in Studio, try name->color-word matching.
+      const colorKey = listing.colorKey || autoLinkColorKey(details.title) || '';
+      listings.push({
+        ...details, quantity: available, graphicKey, colorKey,
+        sizePercent: listing.sizePercent || 100, frameOffset: listing.frameOffset || 0,
+      });
     }
     return json({ listings }, 200, { 'cache-control': 'no-store' });
   }
@@ -307,6 +331,7 @@ export class InventoryLock {
       const listing = await this.state.storage.get(this.listingKey(product.id));
       // Suggest auto-linked key in Studio when none is set.
       const suggestedKey = listing?.graphicKey || autoLinkGraphicKey(details.title);
+      const suggestedColorKey = listing?.colorKey || autoLinkColorKey(details.title);
       listings.push({
         ...details,
         quantity: listing?.quantity || 0,
@@ -315,6 +340,8 @@ export class InventoryLock {
         published: listing?.published || false,
         graphicKey: listing?.graphicKey || '',
         suggestedGraphicKey: suggestedKey || undefined,
+        colorKey: listing?.colorKey || '',
+        suggestedColorKey: suggestedColorKey || undefined,
         sizePercent: listing?.sizePercent || 100,
         frameOffset: listing?.frameOffset || 0,
       });
@@ -327,6 +354,9 @@ export class InventoryLock {
     const quantity = Number(input?.quantity);
     const published = input?.published;
     const graphicKey = typeof input?.graphicKey === 'string' ? input.graphicKey.trim() : '';
+    // colorKey overrides the graphic's baked-in accent color on the public
+    // board. Optional: an empty colorKey just keeps the graphic's own color.
+    const colorKey = typeof input?.colorKey === 'string' ? input.colorKey.trim() : '';
     // sizePercent is Jesse's per-listing display-size hone: 5% steps the
     // Studio stepper applies around the board's base scale. Default 100.
     const rawSize = input?.sizePercent === undefined ? 100 : Number(input?.sizePercent);
@@ -336,6 +366,9 @@ export class InventoryLock {
     const rawFrame = input?.frameOffset === undefined ? 0 : Number(input?.frameOffset);
     if (!Number.isSafeInteger(quantity) || quantity < 0 || typeof published !== 'boolean' || !graphicKey) {
       throw new HttpError(400, 'Stock, graphic, and publish status are required.');
+    }
+    if (colorKey && !PALETTE_FAMILIES.has(colorKey)) {
+      throw new HttpError(400, 'Color must be a known preset family.');
     }
     if (!Number.isSafeInteger(rawSize) || rawSize < 50 || rawSize > 200 || rawSize % 5 !== 0) {
       throw new HttpError(400, 'Size must be a multiple of 5 between 50% and 200%.');
@@ -348,7 +381,7 @@ export class InventoryLock {
     // which read as "the studio update is finicky". Listings only surface
     // through studioListings for Products Stripe actually returns, so a
     // phantom productId is inert.
-    const listing = { productId, quantity, published, graphicKey, sizePercent: rawSize, frameOffset: rawFrame };
+    const listing = { productId, quantity, published, graphicKey, colorKey, sizePercent: rawSize, frameOffset: rawFrame };
     await this.state.storage.put(this.listingKey(productId), listing);
     return json({ listing });
   }

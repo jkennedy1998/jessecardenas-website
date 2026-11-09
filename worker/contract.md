@@ -54,8 +54,8 @@ returns: { listings: array }
 effects: read-artifacts, network, secrets, persistent-session
 via: rpc `GET /api/studio/listings`
 
-### saveStudioListing — set available stock, graphic, and publication state
-send: { productId: string, quantity: number, graphicKey: string, published: boolean }
+### saveStudioListing — set available stock, graphic, accent override, and publication state
+send: { productId: string, quantity: number, graphicKey: string, colorKey: string, published: boolean }
 returns: { listing: object }
 effects: write-artifacts, network, secrets, persistent-session
 via: rpc `PUT /api/studio/listings/:productId`
