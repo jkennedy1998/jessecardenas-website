@@ -13,7 +13,8 @@ or login flow. Each Stripe Product can be given:
 - **total individual earrings** — true stock; units currently held in checkout
   stay counted here until payment lands
 - **approved graphic** — a key from `source/earrings/graphics.json`
-- **publish** — only published records with stock appear in the shop
+- **accent color** — title-derived from a palette word (purple fallback), with a per-listing Studio override
+- **board placement** — a stocked listing appears to customers only once Jesse places it on a board; zero stock hides it until restocked
 
 The Worker binds those values to Stripe's immutable Product ID, so edits to a
 Product name, description, or default Price cannot detach its prepared art.
@@ -69,6 +70,6 @@ deduped, and the Worker verifies Stripe's signature before changing stock.
    Use that endpoint's signing secret for `STRIPE_WEBHOOK_SECRET`.
 
 For a new earring, Jesse creates/edits its Stripe Product and default Price;
-the operator prepares the art, then uses Catalog Studio to choose that graphic,
-enter stock, and publish. Direct video upload is the next version: it will add
+the operator prepares the art, then Jesse uses Catalog Studio to choose that
+visual, set stock/color, and place it on a board. Direct video upload is the next version: it will add
 a media-intake request stage without changing this inventory boundary.

@@ -85,7 +85,7 @@ window.Studio = (() => {
     const graphic = document.createElement('select');
     // A Stripe product whose name matches an approved graphic starts with
     // that graphic selected. Saving makes the choice explicit, while Jesse
-    // can still choose any other approved treatment before publishing.
+    // can still choose any other approved treatment.
     const selectedGraphicKey = listing.graphicKey || listing.suggestedGraphicKey || '';
     graphic.append(option('', 'choose a prepared graphic', selectedGraphicKey));
     for (const [key, visual] of Object.entries(graphics).sort(([, a], [, b]) => a.slug.localeCompare(b.slug))) {
@@ -96,10 +96,9 @@ window.Studio = (() => {
     const colorLabel = document.createElement('label');
     colorLabel.textContent = 'accent color';
     const color = document.createElement('select');
-    // The name-parsed color word starts selected (e.g. "Red square" ->
-    // red); an empty choice keeps the graphic's own baked-in color.
-    const selectedColorKey = listing.colorKey || listing.suggestedColorKey || '';
-    color.append(option('', 'use the graphic color', selectedColorKey));
+    // A title color word starts selected (e.g. "Red square" -> red); names
+    // without one deliberately start purple. Jesse can override either.
+    const selectedColorKey = listing.colorKey || listing.suggestedColorKey || 'purple';
     for (const key of Object.keys(palette).sort((a, b) => a.localeCompare(b))) {
       color.append(option(key, key, selectedColorKey));
     }
@@ -161,19 +160,15 @@ window.Studio = (() => {
     graphic.addEventListener('change', syncFrame);
     syncFrame();
 
-    const publishLabel = document.createElement('label');
-    publishLabel.className = 'studio-check';
-    const published = document.createElement('input');
-    published.type = 'checkbox';
-    published.checked = listing.published;
-    publishLabel.append(published, document.createTextNode(' publish on shop'));
-
     const held = document.createElement('p');
     held.className = 'studio-held';
     const heldText = (data) => {
       const bits = [];
       if (data.reserved) bits.push(`${data.reserved} currently held in checkout`);
       bits.push(`${data.available ?? data.quantity} available now`);
+      bits.push(data.boardNames?.length
+        ? `on ${data.boardNames.join(', ')}`
+        : 'not on a board — add it in the organizer above');
       return bits.join(' · ');
     };
     held.textContent = heldText(listing);
@@ -192,7 +187,6 @@ window.Studio = (() => {
             quantity: Number(stock.value),
             graphicKey: graphic.value,
             colorKey: color.value,
-            published: published.checked,
             sizePercent,
             frameOffset,
           }),
@@ -200,6 +194,7 @@ window.Studio = (() => {
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.error || 'Could not save this listing.');
         setStatus(`${listing.title} saved.`);
+        document.dispatchEvent(new Event('studio:listings-saved'));
         // Re-pull canonical state so the form shows what the Worker stored
         // (holds, availability) instead of trusting the typed values.
         void load();
@@ -215,7 +210,7 @@ window.Studio = (() => {
     previewRow.append(thumb, framePreview);
 
     card.append(heading, previewRow, detail, stockLabel, graphicLabel, colorLabel, sizeLabel,
-      frameLabel, publishLabel, held, save);
+      frameLabel, held, save);
     return card;
   }
 

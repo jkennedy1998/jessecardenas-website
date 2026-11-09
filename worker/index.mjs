@@ -41,12 +41,12 @@ const COLOR_WORD_TO_FAMILY = {
 };
 
 // Auto-link a Stripe product name to a preset color family via word matching.
-// Returns the first color word found, null otherwise. Studio can still override.
+// Purple is the deliberate fallback; Studio always lets Jesse override it.
 const autoLinkColorKey = (productName) => {
   for (const word of productName.toLowerCase().split(/[^a-z]+/)) {
     if (COLOR_WORD_TO_FAMILY[word]) return COLOR_WORD_TO_FAMILY[word];
   }
-  return null;
+  return 'purple';
 };
 
 // Must match the grate's node map in js/dangle.js (10 wires x 10 rows).
@@ -186,6 +186,12 @@ export class InventoryLock {
   reservationKey(id) { return `reservation:${id}`; }
   layoutKey(id) { return `layout:${id}`; }
 
+  async placedProductIds(storage = this.state.storage) {
+    const layouts = await storage.list({ prefix: 'layout:' });
+    return new Set([...layouts.values()].flatMap((layout) =>
+      (layout.items || []).map((item) => item.productId)));
+  }
+
   // Expired pending holds flip to released without touching listing stock —
   // quantity was never decremented at reserve time, so there is nothing to
   // give back. Safe to run anywhere; flipping is idempotent.
@@ -240,11 +246,13 @@ export class InventoryLock {
     };
     await this.state.storage.transaction(async (txn) => {
       await this.expireReservationsInTxn(txn);
-      const reservedByProduct = await this.pendingReservedInTxn(txn);
+      const [reservedByProduct, placedProductIds] = await Promise.all([
+        this.pendingReservedInTxn(txn), this.placedProductIds(txn),
+      ]);
       for (const item of items) {
         const listing = await txn.get(this.listingKey(item.productId));
         const reserved = reservedByProduct.get(item.productId) || 0;
-        if (!listing?.published || listing.quantity - reserved < item.singles) {
+        if (!placedProductIds.has(item.productId) || !listing || listing.quantity - reserved < item.singles) {
           throw new HttpError(409, 'A selected earring is no longer available.');
         }
       }
@@ -288,12 +296,14 @@ export class InventoryLock {
   async catalog() {
     await this.releaseExpiredReservations();
     const products = await this.stripeProducts(true);
-    const reservedByProduct = await this.pendingReservedInTxn(this.state.storage);
+    const [reservedByProduct, placedProductIds] = await Promise.all([
+      this.pendingReservedInTxn(this.state.storage), this.placedProductIds(),
+    ]);
     const listings = [];
     for (const product of products) {
       const details = productDetails(product);
       const listing = await this.state.storage.get(this.listingKey(product.id));
-      if (!details || !listing?.published) continue;
+      if (!details || !listing || !placedProductIds.has(product.id)) continue;
       // Customers see stock minus live holds, so an in-flight checkout makes
       // the unit unavailable without it having been sold yet.
       const available = listing.quantity - (reservedByProduct.get(product.id) || 0);
@@ -313,15 +323,24 @@ export class InventoryLock {
 
   async studioListings() {
     await this.releaseExpiredReservations();
-    const [products, reservations] = await Promise.all([
+    const [products, reservations, layouts] = await Promise.all([
       this.stripeProducts(),
       this.state.storage.list({ prefix: 'reservation:' }),
+      this.layouts(),
     ]);
     const reservedByProduct = new Map();
     for (const reservation of reservations.values()) {
       if (reservation.status !== 'pending') continue;
       for (const item of reservation.items) {
         reservedByProduct.set(item.productId, (reservedByProduct.get(item.productId) || 0) + item.singles);
+      }
+    }
+    const boardNamesByProduct = new Map();
+    for (const layout of layouts) {
+      for (const item of layout.items) {
+        const names = boardNamesByProduct.get(item.productId) || [];
+        names.push(layout.name);
+        boardNamesByProduct.set(item.productId, names);
       }
     }
     const listings = [];
@@ -337,7 +356,7 @@ export class InventoryLock {
         quantity: listing?.quantity || 0,
         reserved: reservedByProduct.get(product.id) || 0,
         available: Math.max(0, (listing?.quantity || 0) - (reservedByProduct.get(product.id) || 0)),
-        published: listing?.published || false,
+        boardNames: boardNamesByProduct.get(product.id) || [],
         graphicKey: listing?.graphicKey || '',
         suggestedGraphicKey: suggestedKey || undefined,
         colorKey: listing?.colorKey || '',
@@ -352,10 +371,8 @@ export class InventoryLock {
   async saveStudioListing(request, productId) {
     const input = await request.json().catch(() => null);
     const quantity = Number(input?.quantity);
-    const published = input?.published;
     const graphicKey = typeof input?.graphicKey === 'string' ? input.graphicKey.trim() : '';
-    // colorKey overrides the graphic's baked-in accent color on the public
-    // board. Optional: an empty colorKey just keeps the graphic's own color.
+    // The Studio sends its title-derived default or Jesse's explicit override.
     const colorKey = typeof input?.colorKey === 'string' ? input.colorKey.trim() : '';
     // sizePercent is Jesse's per-listing display-size hone: 5% steps the
     // Studio stepper applies around the board's base scale. Default 100.
@@ -364,8 +381,8 @@ export class InventoryLock {
     // earring at a different rotation, so the Studio stepper picks which
     // sheet frame the board rests on. Default 0 (frame 1).
     const rawFrame = input?.frameOffset === undefined ? 0 : Number(input?.frameOffset);
-    if (!Number.isSafeInteger(quantity) || quantity < 0 || typeof published !== 'boolean' || !graphicKey) {
-      throw new HttpError(400, 'Stock, graphic, and publish status are required.');
+    if (!Number.isSafeInteger(quantity) || quantity < 0 || !graphicKey) {
+      throw new HttpError(400, 'Stock and graphic are required.');
     }
     if (colorKey && !PALETTE_FAMILIES.has(colorKey)) {
       throw new HttpError(400, 'Color must be a known preset family.');
@@ -381,7 +398,7 @@ export class InventoryLock {
     // which read as "the studio update is finicky". Listings only surface
     // through studioListings for Products Stripe actually returns, so a
     // phantom productId is inert.
-    const listing = { productId, quantity, published, graphicKey, colorKey, sizePercent: rawSize, frameOffset: rawFrame };
+    const listing = { productId, quantity, graphicKey, colorKey, sizePercent: rawSize, frameOffset: rawFrame };
     await this.state.storage.put(this.listingKey(productId), listing);
     return json({ listing });
   }

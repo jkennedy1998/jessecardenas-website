@@ -8,13 +8,14 @@ private Catalog Studio.
 - **Stripe** owns Product title, description, `Material` metadata, active
   status, and default Price.
 - **Catalog Studio** (`/studio/`, protected by a shared password) owns available
-  individual-earring stock, publication, and the prepared graphic selected for
+  individual-earring stock, accent/graphic choices, and board placement for
   each Stripe Product ID.
 - **source/earrings/graphics.json** owns prepared art keyed by stable graphic
   key; a product title can change without breaking its art assignment.
 
-The public shop only shows records that are both published and in stock. A
-single reserves one unit; a pair reserves two.
+The public shop shows earrings that have stock and a board placement. A single
+reserves one unit; a pair reserves two. Zero stock hides an earring while its
+placement remains ready for restocking.
 
 ## adding or changing an earring
 
@@ -22,8 +23,8 @@ single reserves one unit; a pair reserves two.
    in Product metadata as `Material`.
 2. For new/replacement art, the operator prepares the supplied rotation video
    into a frame sequence and adds it to `source/earrings/graphics.json`.
-3. In Catalog Studio, choose that graphic for the Stripe Product, enter stock,
-   and publish.
+3. In Catalog Studio, choose that graphic and accent color, enter stock, then
+   place the earring on a board.
 
 The planned next version lets Jesse submit videos in Studio. It will create a
 reviewable media-intake request; it will not replace approved live art until an

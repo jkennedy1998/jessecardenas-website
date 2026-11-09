@@ -60,3 +60,11 @@
 ### 2026-04-02-product-fields
 - j-quote: "stripe item should have the materials as metaddata, the price should be gotten from there, the description and title as well."
 - interpretation: `Material` comes from Product metadata; name, description, and default Price come from Stripe's normal Product and Price fields.
+
+### 2026-11-09-derived-catalog-visibility
+- j-quote: "if publish instead became > user can set quantity and put them in the frames, that is the only real publish toggle. if there are no quanitty left > remove earing. if there is quanity and its on a grid > it should be on there."
+- interpretation: publication is derived from positive available quantity and a board placement; the independent publish toggle is removed.
+
+### 2026-11-09-title-derived-accent-color
+- j-quote: "also make sure we have the color selection that i outlined to claude in there. ideally we can first pass default color > scan for a color name in the earing that we have. fallback to something reasonable like purple. the user can shift this color from the default value. then we can first pass scan for color, allowing jesse to author less. then they can fix things that might not work out for the auto color detection"
+- interpretation: scan the product title for a supported color word, fall back to purple, and let Jesse explicitly override the selected palette family.

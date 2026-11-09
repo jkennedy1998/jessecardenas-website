@@ -25,6 +25,11 @@ const reservationId = (values) => [...values.keys()]
   .map((key) => values.get(key))
   .find((reservation) => reservation.status === 'pending')?.id;
 
+const place = (storage, ...productIds) => storage.put('layout:shop', {
+  id: 'shop', name: 'shop', order: 1,
+  items: productIds.map((productId, index) => ({ productId, node: index + 1 })),
+});
+
 test('board layouts: public read, studio CRUD, validation', { concurrency: false }, async () => {
   const { storage, values } = memoryStorage();
   const env = { STRIPE_SECRET_KEY: 'test', SITE_ORIGIN: 'https://jessecardenas.com', STUDIO_PASSWORD: 'pw' };
@@ -113,7 +118,7 @@ const product = {
   default_price: { id: 'price_purple', active: true, unit_amount: 5200, currency: 'usd' },
 };
 
-test('Studio publishes Product-ID inventory; checkout holds, payment decrements', { concurrency: false }, async () => {
+test('placed Product-ID inventory joins stock, and checkout holds then decrements it', { concurrency: false }, async () => {
   const { storage, values } = memoryStorage();
   const originalFetch = globalThis.fetch;
   let sessionForm;
@@ -134,13 +139,21 @@ test('Studio publishes Product-ID inventory; checkout holds, payment decrements'
     const saved = await (await lock.fetch(new Request('https://jessecardenas.com/api/studio/listings/prod_purple', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ quantity: 2, graphicKey: 'purple-lollypop', published: true, sizePercent: 105, frameOffset: 3 }),
+      body: JSON.stringify({ quantity: 2, graphicKey: 'purple-lollypop', sizePercent: 105, frameOffset: 3 }),
     }))).json();
     // Saving is a pure local write: no Stripe call can fail it.
     assert.equal(saved.listing.quantity, 2);
     assert.equal(saved.listing.sizePercent, 105);
     assert.equal(saved.listing.frameOffset, 3);
 
+    // Stock alone does not expose an earring; placing it on a board does.
+    const unplaced = await (await lock.fetch(new Request('https://jessecardenas.com/api/catalog'))).json();
+    assert.deepEqual(unplaced.listings, []);
+    await assert.rejects(
+      () => lock.reserve([{ productId: 'prod_purple', singles: 1 }]),
+      (cause) => cause.status === 409,
+    );
+    await place(storage, 'prod_purple');
     const catalog = await (await lock.fetch(new Request('https://jessecardenas.com/api/catalog'))).json();
     assert.deepEqual(catalog.listings[0], {
       productId: 'prod_purple', title: 'Purple lollypop', description: 'Glass candy.',
@@ -187,7 +200,7 @@ test('Studio publishes Product-ID inventory; checkout holds, payment decrements'
   }
 });
 
-test('published listings auto-link an approved graphic and accent color from their Stripe product name', { concurrency: false }, async () => {
+test('placed listings derive title colors with purple fallback and retain Jesse overrides', { concurrency: false }, async () => {
   const { storage } = memoryStorage();
   const originalFetch = globalThis.fetch;
   const blueChandelier = {
@@ -196,7 +209,13 @@ test('published listings auto-link an approved graphic and accent color from the
     name: 'Blue chandelier',
     default_price: { ...product.default_price, id: 'price_blue_chandelier' },
   };
-  globalThis.fetch = async () => new Response(JSON.stringify({ data: [blueChandelier] }));
+  const plainEarring = {
+    ...product,
+    id: 'prod_plain_earring',
+    name: 'Orb',
+    default_price: { ...product.default_price, id: 'price_plain_earring' },
+  };
+  globalThis.fetch = async () => new Response(JSON.stringify({ data: [blueChandelier, plainEarring] }));
 
   try {
     const env = { STRIPE_SECRET_KEY: 'test', SITE_ORIGIN: 'https://jessecardenas.com', STUDIO_PASSWORD: 'pw' };
@@ -204,21 +223,30 @@ test('published listings auto-link an approved graphic and accent color from the
     // This covers older stored listings that predate the Studio suggestion;
     // newly named products receive the same suggestion in Studio before save.
     await storage.put('listing:prod_blue_chandelier', {
-      productId: 'prod_blue_chandelier', quantity: 1, graphicKey: '', published: true,
+      // Legacy publication state is ignored: board placement is now the sole
+      // customer-visibility control.
+      productId: 'prod_blue_chandelier', quantity: 1, graphicKey: '', published: false,
       sizePercent: 100, frameOffset: 0,
     });
+    await storage.put('listing:prod_plain_earring', {
+      productId: 'prod_plain_earring', quantity: 1, graphicKey: 'purple-lollypop',
+      sizePercent: 100, frameOffset: 0,
+    });
+    await place(storage, 'prod_blue_chandelier', 'prod_plain_earring');
 
     const catalog = await (await lock.fetch(new Request('https://jessecardenas.com/api/catalog'))).json();
     assert.equal(catalog.listings[0].graphicKey, 'blue-chandelier');
     assert.equal(catalog.listings[0].colorKey, 'bluie');
+    assert.equal(catalog.listings[1].colorKey, 'purple');
     const studio = await (await lock.fetch(new Request('https://jessecardenas.com/api/studio/listings'))).json();
     assert.equal(studio.listings[0].suggestedGraphicKey, 'blue-chandelier');
     assert.equal(studio.listings[0].suggestedColorKey, 'bluie');
+    assert.equal(studio.listings[1].suggestedColorKey, 'purple');
 
     // Jesse's saved colorKey overrides the name-parsed suggestion.
     await lock.fetch(new Request('https://jessecardenas.com/api/studio/listings/prod_blue_chandelier', {
       method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ quantity: 1, graphicKey: 'blue-chandelier', colorKey: 'purple', published: true }),
+      body: JSON.stringify({ quantity: 1, graphicKey: 'blue-chandelier', colorKey: 'purple' }),
     }));
     const overridden = await (await lock.fetch(new Request('https://jessecardenas.com/api/catalog'))).json();
     assert.equal(overridden.listings[0].colorKey, 'purple');
@@ -236,8 +264,9 @@ test('expired holds release without touching stock and stop consuming availabili
     const lock = new InventoryLock({ storage }, env);
     await lock.fetch(new Request('https://jessecardenas.com/api/studio/listings/prod_purple', {
       method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ quantity: 2, graphicKey: 'purple-lollypop', published: true }),
+      body: JSON.stringify({ quantity: 2, graphicKey: 'purple-lollypop' }),
     }));
+    await place(storage, 'prod_purple');
     await lock.reserve([{ productId: 'prod_purple', singles: 2 }]);
     // Expire the hold in place, then let catalog release it.
     const [, reservation] = [...values].find(([key]) => key.startsWith('reservation:'));
@@ -264,8 +293,9 @@ test('a hold makes later checkouts for the same unit unavailable', { concurrency
     const lock = new InventoryLock({ storage }, env);
     await lock.fetch(new Request('https://jessecardenas.com/api/studio/listings/prod_purple', {
       method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ quantity: 2, graphicKey: 'purple-lollypop', published: true }),
+      body: JSON.stringify({ quantity: 2, graphicKey: 'purple-lollypop' }),
     }));
+    await place(storage, 'prod_purple');
     await lock.reserve([{ productId: 'prod_purple', singles: 2 }]);
     // The second checkout for the same units is refused; the direct DO call
     // surfaces the HttpError instead of the outer wrapper's 409 response.

@@ -368,6 +368,18 @@ window.StudioLayouts = (() => {
     }
   }
 
+  // A stock save below the organizer changes which earrings are eligible for
+  // its picker. Refresh only listings so an in-progress board arrangement is
+  // never discarded.
+  document.addEventListener("studio:listings-saved", async () => {
+    const response = await fetch("/api/studio/listings", { cache: "no-store" });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !Array.isArray(result.listings)) return;
+    listings = result.listings;
+    renderBoard();
+    renderPicker();
+  });
+
   return { load };
 })();
 

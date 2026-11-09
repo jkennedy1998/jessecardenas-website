@@ -4,7 +4,7 @@
 - Join Stripe Products to private shop inventory and prepared graphics, then safely reserve individual earrings for hosted Checkout.
 
 ## owns
-- Product-ID-bound inventory, publication, and graphic-assignment records
+- Product-ID-bound inventory, board-placement eligibility, and graphic-assignment records
 - Catalog Studio API and shared-password authorization check
 - serialized stock reservations, releases, and paid-order confirmation
 - Stripe catalog projection, Checkout Session creation, signature verification, and event dedupe
@@ -36,7 +36,7 @@
 - Cloudflare Durable Objects: persistent inventory, reservation, and webhook-dedupe state
 
 ## exposed interfaces
-### getCatalog — return sellable Product and inventory joins
+### getCatalog — return stocked, board-placed Product and inventory joins
 send: {}
 returns: { listings: array }
 effects: read-artifacts, network, secrets, persistent-session
@@ -54,8 +54,8 @@ returns: { listings: array }
 effects: read-artifacts, network, secrets, persistent-session
 via: rpc `GET /api/studio/listings`
 
-### saveStudioListing — set available stock, graphic, accent override, and publication state
-send: { productId: string, quantity: number, graphicKey: string, colorKey: string, published: boolean }
+### saveStudioListing — set stock, graphic, and accent override
+send: { productId: string, quantity: number, graphicKey: string, colorKey: string }
 returns: { listing: object }
 effects: write-artifacts, network, secrets, persistent-session
 via: rpc `PUT /api/studio/listings/:productId`
@@ -77,7 +77,7 @@ via: rpc `POST /api/webhooks/stripe`
 ## tests
 - worker catalog contract
   - light
-  - validates published stock joins to live Stripe product fields.
+  - validates stocked, board-placed records join to live Stripe product fields.
 - worker checkout reservation contract
   - light
   - validates pair quantities reserve two individual units.
